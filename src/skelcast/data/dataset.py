@@ -61,15 +61,12 @@ def read_skeleton_file(
                 if save_rgbxy:
                     bodymat[rgb_body][frame, joint] = jointinfo[5:7]
     # prune the abundant bodys
-    try:
-        for each in range(max_body):
-            if each >= max(bodymat["nbodys"]):
-                if save_skelxyz:
-                    del bodymat["skel_body{}".format(each)]
-                if save_rgbxy:
-                    del bodymat["rgb_body{}".format(each)]
-                if save_depthxy:
-                    del bodymat["depth_body{}".format(each)]
-    except ValueError:
-        print(f"Error found in file: {file_path}")
+    for each in range(max_body):
+        if each >= max(bodymat["nbodys"]):
+            if save_skelxyz:
+                del bodymat["skel_body{}".format(each)]
+            if save_rgbxy:
+                del bodymat["rgb_body{}".format(each)]
+            if save_depthxy:
+                del bodymat["depth_body{}".format(each)]
     return bodymat

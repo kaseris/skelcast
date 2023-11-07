@@ -1,6 +1,14 @@
+from typing import Any
 import numpy as np
 
-from .prepare_data import get_skeleton_files, get_missing_files, filter_missing
+from torch.utils.data import Dataset
+
+from .prepare_data import (
+    get_skeleton_files,
+    get_missing_files,
+    filter_missing,
+    should_blacklist,
+)
 
 
 def read_skeleton_file(
@@ -70,3 +78,41 @@ def read_skeleton_file(
             if save_depthxy:
                 del bodymat["depth_body{}".format(each)]
     return bodymat
+
+
+class NTURGBDDataset(Dataset):
+    def __init__(
+        self,
+        data_directory: str,
+        missing_files_dir: str = "../data/missing",
+        max_number_of_bodies: int = 4,
+        max_duration: int = 300,
+        n_joints: int = 25,
+    ) -> None:
+        self.data_directory = data_directory
+        self.missing_files_dir = missing_files_dir
+        self.max_number_of_bodies = max_number_of_bodies
+        self.max_duration = max_duration
+        self.n_joints = n_joints
+
+        self.skeleton_files = get_skeleton_files(dataset_dir=self.data_directory)
+        missing_files = get_missing_files(missing_files_dir=self.missing_files_dir)
+        self.skeleton_files = filter_missing(
+            missing_skeleton_names=missing_files, skeleton_files=self.skeleton_files
+        )
+        self.skeleton_files_clean = []
+        for fname in self.skeleton_files:
+            if should_blacklist(fname):
+                continue
+            else:
+                self.skeleton_files_clean.append(fname)
+
+    def __getitem__(self, index) -> Any:
+        fname = self.skeleton_files_clean[index]
+        mat = read_skeleton_file(
+            fname, save_skelxyz=True, save_rgbxy=False, save_depthxy=False
+        )
+        return mat
+
+    def __len__(self):
+        return len(self.skeleton_files_clean)

@@ -1,5 +1,8 @@
+import os
 from typing import Any
+
 import numpy as np
+import torch
 
 from torch.utils.data import Dataset
 
@@ -85,12 +88,16 @@ class NTURGBDDataset(Dataset):
         self,
         data_directory: str,
         missing_files_dir: str = "../data/missing",
+        label_file: str = '../data/labels.txt',
         max_number_of_bodies: int = 4,
         max_duration: int = 300,
         n_joints: int = 25,
     ) -> None:
         self.data_directory = data_directory
         self.missing_files_dir = missing_files_dir
+        self.labels_file = label_file
+        self.labels_dict = dict()
+        self.load_labels()
         self.max_number_of_bodies = max_number_of_bodies
         self.max_duration = max_duration
         self.n_joints = n_joints
@@ -107,12 +114,40 @@ class NTURGBDDataset(Dataset):
             else:
                 self.skeleton_files_clean.append(fname)
 
+    def load_labels(self):
+        with open(self.labels_file, 'r') as f:
+            for line in f:
+                # Strip whitespace and split the line into the code and the label
+                parts = line.strip().split('. ')
+                if len(parts) == 2:
+                    code, label = parts
+                    # Map the code to a tuple of an integer (extracted from the code) and the label
+                    self.labels_dict[code] = (int(code[1:])-1, label)
+
+
     def __getitem__(self, index) -> Any:
         fname = self.skeleton_files_clean[index]
+        # Get the label of the file from the filename
+        activity_code_with_zeros = os.path.basename(fname).split('.')[0][-4:]
+        activity_code = activity_code_with_zeros[0] + str(int(activity_code_with_zeros[1:]))
+        label = self.labels_dict.get(activity_code, None)
+        if label is None:
+            raise ValueError(f"Label for activity code {activity_code} not found in label dictionary.")
+        
+        # Read the joints of the skeletons
         mat = read_skeleton_file(
             fname, save_skelxyz=True, save_rgbxy=False, save_depthxy=False
         )
-        return mat
+        skels = []
+        for i in range(self.max_number_of_bodies):
+            if mat.get(f'skel_body{i}') is not None:
+                skel = mat.get(f'skel_body{i}')
+                skel = np.concatenate([skel, np.zeros((self.max_duration - skel.shape[0], self.n_joints, 3))], axis=0)
+                skels.append(skel)
+            else:
+                skels.append(np.zeros((self.max_duration, self.n_joints, 3)))
+        skeletons_array = np.array(skels)
+        return torch.tensor(skeletons_array).permute(1, 0, 2, 3), label
 
     def __len__(self):
         return len(self.skeleton_files_clean)

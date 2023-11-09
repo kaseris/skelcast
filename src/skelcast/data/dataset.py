@@ -1,10 +1,12 @@
 import os
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Tuple
 
 import numpy as np
 import torch
 
 from torch.utils.data import Dataset
+from torch.utils.data.dataloader import default_collate
 
 from .prepare_data import (
     get_skeleton_files,
@@ -82,6 +84,26 @@ def read_skeleton_file(
                 del bodymat["depth_body{}".format(each)]
     return bodymat
 
+@dataclass
+class NTURBGDSample:
+    x: torch.tensor
+    y: torch.tensor
+    label: Tuple[int, str]
+    mask: torch.tensor
+
+
+def nturbgd_collate_fn(batch):
+    batch_x = [item.x for item in batch]
+    batch_y = [item.y for item in batch]
+    batch_label = [item.label for item in batch]
+    batch_mask = [item.mask for item in batch]
+
+    batch_x = default_collate(batch_x)
+    batch_y = default_collate(batch_y)
+    batch_label = default_collate(batch_label)
+    batch_mask = default_collate(batch_mask)
+    return NTURBGDSample(x=batch_x, y=batch_y, label=batch_label, mask=batch_mask)
+
 
 class NTURGBDDataset(Dataset):
     def __init__(
@@ -89,6 +111,7 @@ class NTURGBDDataset(Dataset):
         data_directory: str,
         missing_files_dir: str = "../data/missing",
         label_file: str = '../data/labels.txt',
+        max_context_window: int = 10,
         max_number_of_bodies: int = 4,
         max_duration: int = 300,
         n_joints: int = 25,
@@ -98,6 +121,7 @@ class NTURGBDDataset(Dataset):
         self.labels_file = label_file
         self.labels_dict = dict()
         self.load_labels()
+        self.max_context_window = max_context_window
         self.max_number_of_bodies = max_number_of_bodies
         self.max_duration = max_duration
         self.n_joints = n_joints
@@ -125,7 +149,7 @@ class NTURGBDDataset(Dataset):
                     self.labels_dict[code] = (int(code[1:])-1, label)
 
 
-    def __getitem__(self, index) -> Any:
+    def __getitem__(self, index) -> NTURBGDSample:
         fname = self.skeleton_files_clean[index]
         # Get the label of the file from the filename
         activity_code_with_zeros = os.path.basename(fname).split('.')[0][-4:]
@@ -142,12 +166,34 @@ class NTURGBDDataset(Dataset):
         for i in range(self.max_number_of_bodies):
             if mat.get(f'skel_body{i}') is not None:
                 skel = mat.get(f'skel_body{i}')
-                skel = np.concatenate([skel, np.zeros((self.max_duration - skel.shape[0], self.n_joints, 3))], axis=0)
                 skels.append(skel)
-            else:
-                skels.append(np.zeros((self.max_duration, self.n_joints, 3)))
-        skeletons_array = np.array(skels)
-        return torch.tensor(skeletons_array).permute(1, 0, 2, 3), label
+        
+        skeletons_array = torch.from_numpy(np.array(skels)).permute(1, 0, 2, 3)
+        
+        padded_data = torch.zeros((self.max_duration, self.max_number_of_bodies, self.n_joints, 3))
+        time_steps, num_skeletons, joints, dim = skeletons_array.shape
+        padded_data[:time_steps, :num_skeletons, :, :] = skeletons_array
+        
+        mask = torch.zeros((self.max_duration,), dtype=torch.bool)
+        mask[:time_steps] = 1
+
+        input_windows = []
+        target_windows = []
+
+        for start in range(self.max_duration - self.max_context_window):
+            end = start + self.max_context_window
+            input_window = padded_data[start:end]
+            target_window = padded_data[start+1:end+1]
+            input_windows.append(input_window)
+            target_windows.append(target_window)
+
+        x = torch.stack(input_windows)
+        x = x.view(x.shape[0], self.max_context_window, self.max_number_of_bodies * self.n_joints * 3)
+        y = torch.stack(target_windows)
+        y = y.view(y.shape[0], self.max_context_window, self.max_number_of_bodies * self.n_joints * 3)
+
+        return NTURBGDSample(x, y, label, mask)
+
 
     def __len__(self):
         return len(self.skeleton_files_clean)

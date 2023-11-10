@@ -85,11 +85,12 @@ def read_skeleton_file(
     return bodymat
 
 @dataclass
-class NTURBGDSample:
+class NTURGBDSample:
     x: torch.tensor
     y: torch.tensor
     label: Tuple[int, str]
     mask: torch.tensor
+    seq_len: int
 
 
 def nturbgd_collate_fn(batch):
@@ -97,12 +98,14 @@ def nturbgd_collate_fn(batch):
     batch_y = [item.y for item in batch]
     batch_label = [item.label for item in batch]
     batch_mask = [item.mask for item in batch]
+    batch_seq_len = [item.seq_len for item in batch]
 
     batch_x = default_collate(batch_x)
     batch_y = default_collate(batch_y)
     batch_label = default_collate(batch_label)
     batch_mask = default_collate(batch_mask)
-    return NTURBGDSample(x=batch_x, y=batch_y, label=batch_label, mask=batch_mask)
+    batch_seq_len = default_collate(batch_seq_len)
+    return NTURGBDSample(x=batch_x, y=batch_y, label=batch_label, mask=batch_mask, seq_len=batch_seq_len)
 
 
 class NTURGBDDataset(Dataset):
@@ -149,7 +152,7 @@ class NTURGBDDataset(Dataset):
                     self.labels_dict[code] = (int(code[1:])-1, label)
 
 
-    def __getitem__(self, index) -> NTURBGDSample:
+    def __getitem__(self, index) -> NTURGBDSample:
         fname = self.skeleton_files_clean[index]
         # Get the label of the file from the filename
         activity_code_with_zeros = os.path.basename(fname).split('.')[0][-4:]
@@ -192,7 +195,7 @@ class NTURGBDDataset(Dataset):
         y = torch.stack(target_windows)
         y = y.view(y.shape[0], self.max_context_window, self.max_number_of_bodies * self.n_joints * 3)
 
-        return NTURBGDSample(x, y, label, mask)
+        return NTURGBDSample(x, y, label, mask, time_steps)
 
 
     def __len__(self):

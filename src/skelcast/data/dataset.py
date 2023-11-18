@@ -1,6 +1,6 @@
 import os
 from dataclasses import dataclass
-from typing import Any, Tuple
+from typing import Any, Tuple, List
 
 import numpy as np
 import torch
@@ -89,23 +89,36 @@ class NTURGBDSample:
     x: torch.tensor
     y: torch.tensor
     label: Tuple[int, str]
-    mask: torch.tensor
-    seq_len: int
 
-
-def nturbgd_collate_fn(batch):
-    batch_x = [item.x for item in batch]
-    batch_y = [item.y for item in batch]
+def nturbgd_collate_fn_with_overlapping_context_window(batch: List[NTURGBDSample]) -> NTURGBDSample:
+    # TODO: Normalize each sample individually along its 3 axes 
+    batch_x = torch.cat([item.x for item in batch], dim=0)
+    batch_y = torch.cat([item.y for item in batch], dim=0)
     batch_label = [item.label for item in batch]
-    batch_mask = [item.mask for item in batch]
-    batch_seq_len = [item.seq_len for item in batch]
 
-    batch_x = default_collate(batch_x)
-    batch_y = default_collate(batch_y)
+    # batch_x = default_collate(batch_x)
+    # batch_y = default_collate(batch_y)
     batch_label = default_collate(batch_label)
-    batch_mask = default_collate(batch_mask)
-    batch_seq_len = default_collate(batch_seq_len)
-    return NTURGBDSample(x=batch_x, y=batch_y, label=batch_label, mask=batch_mask, seq_len=batch_seq_len)
+    return NTURGBDSample(x=batch_x, y=batch_y, label=batch_label)
+
+class NTURGBDCollateFn:
+    def __init__(self, block_size: int) -> None:
+        self.block_size = block_size
+        
+    def __call__(self, batch) -> NTURGBDSample:
+        seq_lens = [sample.shape[0] for sample, _ in batch]
+        labels = [label for _, label in batch]
+        context = []
+        target = []
+        for seq_len, sample in zip(seq_lens, batch):
+            x, _ = sample
+            idx = torch.randint(seq_len - self.block_size, (1, ))
+            context.append(x[idx:idx + self.block_size])
+            target.append(x[idx + 1:idx + self.block_size + 1])
+        labels_batch = default_collate(labels)
+        return NTURGBDSample(x=torch.stack(context),
+                             y=torch.stack(target),
+                             label=labels_batch)
 
 
 class NTURGBDDataset(Dataset):
@@ -118,6 +131,7 @@ class NTURGBDDataset(Dataset):
         max_number_of_bodies: int = 4,
         max_duration: int = 300,
         n_joints: int = 25,
+        transforms: Any = None
     ) -> None:
         self.data_directory = data_directory
         self.missing_files_dir = missing_files_dir
@@ -128,6 +142,7 @@ class NTURGBDDataset(Dataset):
         self.max_number_of_bodies = max_number_of_bodies
         self.max_duration = max_duration
         self.n_joints = n_joints
+        self.transforms = transforms
 
         self.skeleton_files = get_skeleton_files(dataset_dir=self.data_directory)
         missing_files = get_missing_files(missing_files_dir=self.missing_files_dir)
@@ -150,9 +165,23 @@ class NTURGBDDataset(Dataset):
                     code, label = parts
                     # Map the code to a tuple of an integer (extracted from the code) and the label
                     self.labels_dict[code] = (int(code[1:])-1, label)
+                    
+    def get_windows(self, x):
+        seq_len = x.shape[0]
+        input_windows = []
+        target_labels = []
+        for i in range(seq_len - self.max_context_window):
+            window = x[i:i + self.max_context_window, ...]
+            target_label = x[i + self.max_context_window, ...]
+            input_windows.append(window)
+            target_labels.append(target_label)
+        input_windows = np.array(input_windows)
+        input_windows_tensor = torch.tensor(input_windows, dtype=torch.float)
+        target_labels_tensor = torch.tensor(np.array(target_labels), dtype=torch.float).unsqueeze(0)
+        return input_windows_tensor, target_labels_tensor
 
 
-    def __getitem__(self, index) -> NTURGBDSample:
+    def __getitem__(self, index) -> torch.Tensor:
         fname = self.skeleton_files_clean[index]
         # Get the label of the file from the filename
         activity_code_with_zeros = os.path.basename(fname).split('.')[0][-4:]
@@ -172,30 +201,10 @@ class NTURGBDDataset(Dataset):
                 skels.append(skel)
         
         skeletons_array = torch.from_numpy(np.array(skels)).permute(1, 0, 2, 3)
+        if self.transforms:
+            skeletons_array = self.transforms(skeletons_array)
         
-        padded_data = torch.zeros((self.max_duration, self.max_number_of_bodies, self.n_joints, 3))
-        time_steps, num_skeletons, joints, dim = skeletons_array.shape
-        padded_data[:time_steps, :num_skeletons, :, :] = skeletons_array
-        
-        mask = torch.zeros((self.max_duration,), dtype=torch.bool)
-        mask[:time_steps] = 1
-
-        input_windows = []
-        target_windows = []
-
-        for start in range(self.max_duration - self.max_context_window):
-            end = start + self.max_context_window
-            input_window = padded_data[start:end]
-            target_window = padded_data[start+1:end+1]
-            input_windows.append(input_window)
-            target_windows.append(target_window)
-
-        x = torch.stack(input_windows)
-        x = x.view(x.shape[0], self.max_context_window, self.max_number_of_bodies * self.n_joints * 3)
-        y = torch.stack(target_windows)
-        y = y.view(y.shape[0], self.max_context_window, self.max_number_of_bodies * self.n_joints * 3)
-
-        return NTURGBDSample(x, y, label, mask, time_steps)
+        return skeletons_array, label
 
 
     def __len__(self):

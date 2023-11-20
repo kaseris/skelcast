@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
 
+from skelcast.models import SkelcastModule
 
-class SimpleLSTMRegressor(nn.Module):
+class SimpleLSTMRegressor(SkelcastModule):
     def __init__(self,
                  hidden_size,
                  num_layers,
@@ -36,3 +37,13 @@ class SimpleLSTMRegressor(nn.Module):
             loss = self.criterion(out, y)
             return out, loss
         return out
+
+    def training_step(self, x: torch.Tensor, y: torch.Tensor):
+        out, loss = self(x, y)
+        return {'out': out, 'loss': loss}
+    
+    @torch.no_grad()
+    def validation_step(self, x, y):
+        out, loss = self(x, y)
+        return {'out': out, 'loss': loss}
+    

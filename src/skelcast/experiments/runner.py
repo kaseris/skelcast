@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from skelcast.models import SkelcastModule
 from skelcast.data.dataset import NTURGBDCollateFn, NTURGBDSample
+from skelcast.callbacks.console import ConsoleCallback
 
 
 class Runner:
@@ -49,18 +50,33 @@ class Runner:
         else:
             self.device = torch.device('cpu')
 
+        self.console_callback = ConsoleCallback()
+
     def setup(self):
         self.model.to(self.device)
         self._total_train_batches = len(self.train_set) // self.train_batch_size
         self._total_val_batches = len(self.val_set) // self.val_batch_size
+        self.console_callback.final_epoch = self.n_epochs
 
 
     def fit(self):
         for epoch in range(self.n_epochs):
+            self.console_callback.on_epoch_start(epoch=epoch)
             for train_batch_idx, train_batch in enumerate(self.train_loader):
                 self.training_step(train_batch=train_batch)
+                self.console_callback.on_batch_end(batch_idx=train_batch_idx,
+                                                   loss=self.training_loss_per_step[-1],
+                                                   phase='train')
+            epoch_loss = sum(self.training_loss_per_step[epoch * self._total_train_batches:(epoch + 1) * self._total_train_batches]) / self._total_train_batches
+            self.console_callback.on_epoch_end(epoch=epoch,
+                                               epoch_loss=epoch_loss)
             for val_batch_idx, val_batch in enumerate(self.val_loader):
                 self.validation_step(val_batch=val_batch)
+                self.console_callback.on_batch_end(batch_idx=val_batch_idx,
+                                                   loss=self.validation_loss_per_step[-1],
+                                                   phase='val')
+            epoch_loss = sum(self.validation_loss_per_step[epoch * self._total_train_batches:(epoch + 1) * self._total_train_batches]) / self._total_train_batches
+            self.console_callback.on_epoch_end(epoch=epoch, epoch_loss=epoch_loss, phase='val')
 
         return {
             'training_loss_history': self.training_loss_history,
@@ -75,7 +91,8 @@ class Runner:
         x, y = x.to(torch.float32), y.to(torch.float32)
         x, y = x.to(self.device), y.to(self.device)
 
-        out, loss = self.model.training_step()
+        out = self.model.training_step(x, y)
+        loss = out['loss']
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
@@ -88,6 +105,7 @@ class Runner:
         x, y = x.to(torch.float32), y.to(torch.float32)
         x, y = x.to(self.device), y.to(self.device)
 
-        out, loss = self.model.validation_step()
+        out = self.model.validation_step(x, y)
+        loss = out['loss']
         self.validation_loss_per_step.append(loss.item())
     

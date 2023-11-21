@@ -38,12 +38,15 @@ class SimpleLSTMRegressor(SkelcastModule):
             return out, loss
         return out
 
-    def training_step(self, x: torch.Tensor, y: torch.Tensor):
+    def training_step(self, x: torch.Tensor, y: torch.Tensor) -> dict:
         out, loss = self(x, y)
         return {'out': out, 'loss': loss}
     
     @torch.no_grad()
-    def validation_step(self, x, y):
+    def validation_step(self, x, y) -> dict:
         out, loss = self(x, y)
         return {'out': out, 'loss': loss}
     
+    @torch.no_grad()
+    def predict(self):
+        pass

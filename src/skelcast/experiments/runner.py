@@ -76,7 +76,7 @@ class Runner:
                 self.console_callback.on_batch_end(batch_idx=val_batch_idx,
                                                    loss=self.validation_loss_per_step[-1],
                                                    phase='val')
-            epoch_loss = sum(self.validation_loss_per_step[epoch * self._total_train_batches:(epoch + 1) * self._total_train_batches]) / self._total_train_batches
+            epoch_loss = sum(self.validation_loss_per_step[epoch * self._total_val_batches:(epoch + 1) * self._total_val_batches]) / self._total_val_batches
             self.console_callback.on_epoch_end(epoch=epoch, epoch_loss=epoch_loss, phase='val')
             self.validation_loss_history.append(epoch_loss)
 

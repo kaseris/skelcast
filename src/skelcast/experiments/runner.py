@@ -143,7 +143,7 @@ class Runner:
         start_epoch = checkpoint.get('epoch', 0) + 1
         
         # resume the training
-        for epoch in range(self.n_epochs):
+        for epoch in range(start_epoch, self.n_epochs):
             self.console_callback.on_epoch_start(epoch=epoch)
             for train_batch_idx, train_batch in enumerate(self.train_loader):
                 self.training_step(train_batch=train_batch)

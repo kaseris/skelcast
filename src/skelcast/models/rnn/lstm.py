@@ -52,6 +52,8 @@ class SimpleLSTMRegressor(SkelcastModule):
         out, loss = self(x, y)
         return {'out': out, 'loss': loss}
     
+
     @torch.no_grad()
     def predict(self):
         pass
+

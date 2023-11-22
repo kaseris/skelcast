@@ -1,4 +1,4 @@
-import sys
+import os
 
 import torch
 import torch.nn as nn
@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader, Dataset
 from skelcast.models import SkelcastModule
 from skelcast.data.dataset import NTURGBDCollateFn, NTURGBDSample
 from skelcast.callbacks.console import ConsoleCallback
-
+from skelcast.callbacks.checkpoint import CheckpointCallback
 
 class Runner:
     def __init__(self,
@@ -20,7 +20,9 @@ class Runner:
                  model: SkelcastModule,
                  optimizer: torch.optim.Optimizer = None,
                  n_epochs: int = 10,
-                 device: str = 'cpu') -> None:
+                 device: str = 'cpu',
+                 checkpoint_dir: str = None,
+                 checkpoint_frequency: int = 1) -> None:
         self.train_set = train_set
         self.val_set = val_set
         self.train_batch_size = train_batch_size
@@ -51,6 +53,12 @@ class Runner:
             self.device = torch.device('cpu')
 
         self.console_callback = ConsoleCallback()
+        
+        self.checkpoint_dir = checkpoint_dir
+        self.checkpoint_frequency = checkpoint_frequency
+        assert os.path.exists(self.checkpoint_dir), f'The designated checkpoint directory `{self.checkpoint_dir}` does not exist.'
+        self.checkpoint_callback = CheckpointCallback(checkpoint_dir=self.checkpoint_dir,
+                                                      frequency=self.checkpoint_frequency)
 
     def setup(self):
         self.model.to(self.device)
@@ -79,6 +87,7 @@ class Runner:
             epoch_loss = sum(self.validation_loss_per_step[epoch * self._total_val_batches:(epoch + 1) * self._total_val_batches]) / self._total_val_batches
             self.console_callback.on_epoch_end(epoch=epoch, epoch_loss=epoch_loss, phase='val')
             self.validation_loss_history.append(epoch_loss)
+            self.checkpoint_callback.on_epoch_end(epoch=epoch, runner=self)
 
         return {
             'training_loss_history': self.training_loss_history,
@@ -111,3 +120,54 @@ class Runner:
         loss = out['loss']
         self.validation_loss_per_step.append(loss.item())
     
+    def resume(self, checkpoint_path):
+        """
+        Resumes training from a saved checkpoint.
+
+        Args:
+        
+        - checkpoint_path: Path to the checkpoint file.
+        """
+        # Load the checkpoint
+        checkpoint = torch.load(checkpoint_path)
+        
+        # Restore the previous' epoch's state
+        self.model.load_state_dict(checkpoint.get('model_state_dict'))
+        self.optimizer.load_state_dict(checkpoint.get('optimizer_state_dict'))
+        self.training_loss_history = checkpoint.get('training_loss_history')
+        self.validation_loss_history = checkpoint.get('validation_loss_history')
+        self.training_loss_per_step = checkpoint.get('training_loss_per_step', [])
+        self.validation_loss_per_step = checkpoint.get('validation_loss_per_step', [])
+        
+        # Set the current epoch to the loaded epoch and start from the next
+        start_epoch = checkpoint.get('epoch', 0) + 1
+        
+        # resume the training
+        for epoch in range(start_epoch, self.n_epochs):
+            self.console_callback.on_epoch_start(epoch=epoch)
+            for train_batch_idx, train_batch in enumerate(self.train_loader):
+                self.training_step(train_batch=train_batch)
+                self.console_callback.on_batch_end(batch_idx=train_batch_idx,
+                                                   loss=self.training_loss_per_step[-1],
+                                                   phase='train')
+            epoch_loss = sum(self.training_loss_per_step[epoch * self._total_train_batches:(epoch + 1) * self._total_train_batches]) / self._total_train_batches
+            self.console_callback.on_epoch_end(epoch=epoch,
+                                               epoch_loss=epoch_loss, phase='train')
+            self.training_loss_history.append(epoch_loss)
+            for val_batch_idx, val_batch in enumerate(self.val_loader):
+                self.validation_step(val_batch=val_batch)
+                self.console_callback.on_batch_end(batch_idx=val_batch_idx,
+                                                   loss=self.validation_loss_per_step[-1],
+                                                   phase='val')
+            epoch_loss = sum(self.validation_loss_per_step[epoch * self._total_val_batches:(epoch + 1) * self._total_val_batches]) / self._total_val_batches
+            self.console_callback.on_epoch_end(epoch=epoch, epoch_loss=epoch_loss, phase='val')
+            self.validation_loss_history.append(epoch_loss)
+            self.checkpoint_callback.on_epoch_end(epoch=epoch, runner=self)
+
+        return {
+            'training_loss_history': self.training_loss_history,
+            'training_loss_per_step': self.training_loss_per_step,
+            'validation_loss_history': self.validation_loss_history,
+            'validation_loss_per_step': self.validation_loss_per_step
+        }
+        

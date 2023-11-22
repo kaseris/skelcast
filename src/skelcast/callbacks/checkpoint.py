@@ -21,7 +21,7 @@ class CheckpointCallback(Callback):
     
     def on_epoch_end(self, epoch, runner):
         if epoch % self.frequency == 0:
-            pass
+            self.save_checkpoint(runner=runner, epoch=epoch)
     
     def on_batch_start(self):
         pass

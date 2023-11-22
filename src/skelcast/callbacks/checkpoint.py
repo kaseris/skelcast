@@ -1,7 +1,6 @@
 import torch
 
 from skelcast.callbacks.callback import Callback
-from skelcast.experiments.runner import Runner
 
 
 class CheckpointCallback(Callback):
@@ -20,7 +19,7 @@ class CheckpointCallback(Callback):
     def on_epoch_start(self):
         pass
     
-    def on_epoch_end(self, epoch, runner: Runner):
+    def on_epoch_end(self, epoch, runner):
         if epoch % self.frequency == 0:
             pass
     
@@ -30,7 +29,7 @@ class CheckpointCallback(Callback):
     def on_batch_end(self):
         pass
     
-    def save_checkpoint(self, runner: Runner, epoch: int):
+    def save_checkpoint(self, runner, epoch: int):
         """
         Saves the checkpoint.
         

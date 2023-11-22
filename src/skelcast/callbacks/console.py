@@ -11,11 +11,14 @@ class ConsoleCallback(Callback):
         self.latest_val_loss = "N/A"
         self.current_batch = "N/A"
         self.final_epoch = 0
+        self.validation_batches = 0
+        self.training_batches = 0
+        self.total_batches = 0
 
     def on_epoch_start(self, epoch):
         self.current_epoch = epoch
-        self.latest_train_loss = "N/A"  # Reset at the start of each epoch
-        self.latest_val_loss = "N/A"
+        # self.latest_train_loss = "N/A"  # Reset at the start of each epoch
+        # self.latest_val_loss = "N/A"
 
     def on_batch_start(self):
         pass
@@ -25,8 +28,10 @@ class ConsoleCallback(Callback):
 
         if phase == 'train':
             self.latest_train_loss = f"{loss:.4f}"
+            self.total_batches = self.training_batches
         elif phase == 'val':
             self.latest_val_loss = f"{loss:.4f}"
+            self.total_batches = self.validation_batches
         
         self._print_status()
 
@@ -43,7 +48,7 @@ class ConsoleCallback(Callback):
 
     def _print_status(self):
         clear_line = '\r' + ' ' * 80  # Create a line of 80 spaces
-        message = f"Epoch: {self.current_epoch + 1}, Batch: {self.current_batch}, Train Loss: {self.latest_train_loss}, Val Loss: {self.latest_val_loss}"
+        message = f"Epoch: {self.current_epoch + 1}/{self.final_epoch}, Batch: {self.current_batch}/{self.total_batches}, Train Loss: {self.latest_train_loss}, Val Loss: {self.latest_val_loss}"
         
         # First, print the clear_line to overwrite the previous output, then print your message
         print(f'{clear_line}\r{message}', end='')

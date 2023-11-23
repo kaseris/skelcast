@@ -65,6 +65,8 @@ class Runner:
         self._total_train_batches = len(self.train_set) // self.train_batch_size
         self._total_val_batches = len(self.val_set) // self.val_batch_size
         self.console_callback.final_epoch = self.n_epochs
+        self.console_callback.training_batches = self._total_train_batches
+        self.console_callback.validation_batches = self._total_val_batches
 
 
     def fit(self):

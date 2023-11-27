@@ -5,7 +5,6 @@ import os.path as osp
 def get_missing_files(missing_files_dir):
     missing_skel_files = []
     for fname in os.listdir(missing_files_dir):
-        print(fname)
         with open(osp.join(missing_files_dir, fname)) as f:
             for idx, line in enumerate(f):
                 if idx > 2:
@@ -31,7 +30,6 @@ def filter_missing(skeleton_files: list, missing_skeleton_names: list):
         for f in skeleton_files
         if os.path.splitext(os.path.basename(f))[0] not in missing_skeleton_names
     ]
-    print(f"Skeleton files after filtering: {len(filtered_skeleton_files)} files left.")
     return filtered_skeleton_files
 
 

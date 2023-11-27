@@ -1,5 +1,8 @@
 import torch
 import torch.nn as nn
+from torch.nn.utils.rnn import PackedSequence
+
+from typing import Union
 
 from skelcast.models import SkelcastModule
 
@@ -11,7 +14,8 @@ class SimpleLSTMRegressor(SkelcastModule):
                  batch_first: bool = True,
                  num_bodies: int = 1,
                  n_joints: int = 25,
-                 n_dims: int = 3) -> None:
+                 n_dims: int = 3,
+                 reduction: str = 'mean') -> None:
         super().__init__()
         self.num_bodies = num_bodies
         self.n_joints = n_joints
@@ -22,24 +26,26 @@ class SimpleLSTMRegressor(SkelcastModule):
                             batch_first=batch_first)
         self.linear = nn.Linear(in_features=hidden_size, out_features=input_size)
         self.relu = nn.ReLU()
-        self.criterion = nn.MSELoss(reduction='sum')
+        self.criterion = nn.MSELoss(reduction=reduction)
     
-    def forward(self, x: torch.Tensor,
-                y: torch.Tensor = None):
-        assert x.ndim == 5, f'`x` must be a 5-dimensional tensor. Found {x.ndim} dimension(s).'
-        batch_size, context_size, num_bodies, n_joints, n_dims = x.shape
-        assert num_bodies == self.num_bodies, f'The number of bodies in the position 2 of the tensor is {num_bodies}, but it should be {self.num_bodies}'
-        assert n_joints == self.n_joints, f'The number of bodies in the position 3 of the tensor is {n_joints}, but it should be {self.n_joints}'
-        assert n_dims == self.n_dims, f'The number of bodies in the position 3 of the tensor is {n_dims}, but it should be {self.n_dims}'
+    def forward(self, x: Union[torch.Tensor, PackedSequence],
+                y: Union[torch.Tensor, PackedSequence] = None):
+        if isinstance(x, torch.Tensor):
+            assert x.ndim == 5, f'`x` must be a 5-dimensional tensor. Found {x.ndim} dimension(s).'
+            batch_size, context_size, n_dim = x.shape
+            assert n_dim == self.num_bodies * self.n_joints * self.n_dims, f'The number of bodies in the position 2 of the tensor is {n_dim}, but it should be {self.num_bodies * self.n_joints * self.n_dims}'
+        else:
+            assert x.data.ndim == 3, f'`x` must be a 5-dimensional tensor. Found {x.ndim} dimension(s).'
+            batch_size, context_size, n_dim = x.data.shape
+            assert n_dim == self.num_bodies * self.n_joints * self.n_dims, f'The number of bodies in the position 2 of the tensor is {n_dim}, but it should be {self.num_bodies * self.n_joints * self.n_dims}'
 
-        x = x.view(batch_size, context_size, num_bodies * n_joints * n_dims)
-        x = self.linear_transform(x)
+        x = self.linear_transform(x if isinstance(x, torch.Tensor) else x.data)
         out, _ = self.lstm(x)
-        out = self.linear(out)
-        out = self.relu(out)
+        out = self.linear(out if isinstance(out, torch.Tensor) else out.data)
+        out = self.relu(out if isinstance(out, torch.Tensor) else out.data)
         if y is not None:
-            y = y.view(batch_size, context_size, num_bodies * n_joints * n_dims)
-            loss = self.criterion(out, y)
+            loss = self.criterion(out if isinstance(out, torch.Tensor) else out.data,
+                                  y if isinstance(y, torch.Tensor) else y.data)
             return out, loss
         return out
 

@@ -101,25 +101,62 @@ def nturbgd_collate_fn_with_overlapping_context_window(batch: List[NTURGBDSample
     batch_label = default_collate(batch_label)
     return NTURGBDSample(x=batch_x, y=batch_y, label=batch_label)
 
+
 class NTURGBDCollateFn:
-    def __init__(self, block_size: int) -> None:
+    """
+    Custom collate function for batched variable-length sequences.
+    During the __call__ function, we creata `block_size`-long context windows, for each sequence in the batch.
+    If is_packed is True, we pack the padded sequences, otherwise we return the padded sequences as is.
+
+    Args:
+    - block_size (int): Sequence's context length.
+    - is_packed (bool): Whether to pack the padded sequence or not.
+
+    Returns:
+    
+    The batched padded sequences ready to be fed to a transformer or an lstm model.
+    """
+    def __init__(self, block_size: int, is_packed: bool = False) -> None:
         self.block_size = block_size
+        self.is_packed = is_packed
         
     def __call__(self, batch) -> NTURGBDSample:
         seq_lens = [sample.shape[0] for sample, _ in batch]
         labels = [label for _, label in batch]
-        context = []
-        target = []
-        for seq_len, sample in zip(seq_lens, batch):
-            x, _ = sample
-            idx = torch.randint(seq_len - self.block_size, (1, ))
-            context.append(x[idx:idx + self.block_size])
-            target.append(x[idx + 1:idx + self.block_size + 1])
-        labels_batch = default_collate(labels)
-        return NTURGBDSample(x=torch.stack(context),
-                             y=torch.stack(target),
-                             label=labels_batch)
-
+        # A dataset's sample has a shape of (seq_len, n_bodies, n_joints, 3)
+        # We want to create context windows of size `block_size` for each sample
+        # and stack them together to form a batch of shape (batch_size, block_size, n_bodies, n_joints, 3)
+        # We also want to create a target tensor of shape (batch_size, n_bodies, n_joints, 3)
+        # The targets are shifted by 1 timestep to the right, so that the model can predict the next timestep
+        batch_x = []
+        batch_y = []
+        for sample, _ in batch:
+            x, y = self.get_windows(sample)
+            batch_x.append(x)
+            batch_y.append(y)
+        # Pad the sequences to the maximum sequence length in the batch
+        batch_x = torch.nn.utils.rnn.pad_sequence(batch_x, batch_first=True)
+        batch_y = torch.nn.utils.rnn.pad_sequence(batch_y, batch_first=True)
+        if self.is_packed:
+            batch_x = torch.nn.utils.rnn.pack_padded_sequence(batch_x, seq_lens, batch_first=True, enforce_sorted=False)
+            batch_y = torch.nn.utils.rnn.pack_padded_sequence(batch_y, seq_lens, batch_first=True, enforce_sorted=False)
+        labels = default_collate(labels)
+        return NTURGBDSample(x=batch_x, y=batch_y, label=labels)
+    
+    def get_windows(self, x):
+        seq_len = x.shape[0]
+        input_windows = []
+        target_labels = []
+        for i in range(seq_len - self.block_size):
+            window = x[i:i + self.block_size, ...]
+            target_label = x[i + 1:i + self.block_size + 1, ...]
+            input_windows.append(window)
+            target_labels.append(target_label)
+        input_windows = np.array(input_windows)
+        input_windows_tensor = torch.tensor(input_windows, dtype=torch.float)
+        target_labels_tensor = torch.tensor(np.array(target_labels), dtype=torch.float)
+        return input_windows_tensor, target_labels_tensor
+        
 
 class NTURGBDDataset(Dataset):
     def __init__(
@@ -165,20 +202,6 @@ class NTURGBDDataset(Dataset):
                     code, label = parts
                     # Map the code to a tuple of an integer (extracted from the code) and the label
                     self.labels_dict[code] = (int(code[1:])-1, label)
-                    
-    def get_windows(self, x):
-        seq_len = x.shape[0]
-        input_windows = []
-        target_labels = []
-        for i in range(seq_len - self.max_context_window):
-            window = x[i:i + self.max_context_window, ...]
-            target_label = x[i + self.max_context_window, ...]
-            input_windows.append(window)
-            target_labels.append(target_label)
-        input_windows = np.array(input_windows)
-        input_windows_tensor = torch.tensor(input_windows, dtype=torch.float)
-        target_labels_tensor = torch.tensor(np.array(target_labels), dtype=torch.float).unsqueeze(0)
-        return input_windows_tensor, target_labels_tensor
 
 
     def __getitem__(self, index) -> torch.Tensor:

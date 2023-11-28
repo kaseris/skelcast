@@ -163,18 +163,26 @@ class Runner:
                 self.console_callback.on_batch_end(batch_idx=train_batch_idx,
                                                    loss=self.training_loss_per_step[-1],
                                                    phase='train')
+                if self.logger is not None:
+                    self.logger.add_scalar(tag='train/step_loss', scalar_value=self.training_loss_per_step[-1], global_step=len(self.training_loss_per_step))
             epoch_loss = sum(self.training_loss_per_step[epoch * self._total_train_batches:(epoch + 1) * self._total_train_batches]) / self._total_train_batches
             self.console_callback.on_epoch_end(epoch=epoch,
                                                epoch_loss=epoch_loss, phase='train')
             self.training_loss_history.append(epoch_loss)
+            if self.logger is not None:
+                self.logger.add_scalar(tag='train/epoch_loss', scalar_value=epoch_loss, global_step=epoch)
             for val_batch_idx, val_batch in enumerate(self.val_loader):
                 self.validation_step(val_batch=val_batch)
                 self.console_callback.on_batch_end(batch_idx=val_batch_idx,
                                                    loss=self.validation_loss_per_step[-1],
                                                    phase='val')
+                if self.logger is not None:
+                    self.logger.add_scalar(tag='val/step_loss', scalar_value=self.validation_loss_per_step[-1], global_step=len(self.validation_loss_per_step))
             epoch_loss = sum(self.validation_loss_per_step[epoch * self._total_val_batches:(epoch + 1) * self._total_val_batches]) / self._total_val_batches
             self.console_callback.on_epoch_end(epoch=epoch, epoch_loss=epoch_loss, phase='val')
             self.validation_loss_history.append(epoch_loss)
+            if self.logger is not None:
+                self.logger.add_scalar(tag='val/epoch_loss', scalar_value=epoch_loss, global_step=epoch)
             self.checkpoint_callback.on_epoch_end(epoch=epoch, runner=self)
 
         return {

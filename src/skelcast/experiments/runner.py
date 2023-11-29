@@ -86,7 +86,7 @@ class Runner:
         loss_per_step = self.training_loss_per_step if phase == 'train' else self.validation_loss_per_step
 
         for batch_idx, batch in enumerate(loader):
-            step_method(batch=batch)
+            step_method(batch)
             self.console_callback.on_batch_end(batch_idx=batch_idx,
                                                loss=loss_per_step[-1],
                                                phase=phase)

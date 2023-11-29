@@ -1,6 +1,10 @@
 import torch
 from typing import Tuple
 
+from skelcast.data import TRANSFORMS
+
+
+@TRANSFORMS.register_module()
 class MinMaxScaleTransform:
 
     def __init__(self, feature_scale: Tuple[float, float]) -> None:

@@ -12,6 +12,48 @@ from skelcast.callbacks.checkpoint import CheckpointCallback
 from skelcast.logger.base import BaseLogger
 
 class Runner:
+    """
+    A training and validation runner for models in the Skelcast framework.
+
+    This class handles the setup, training, validation, and checkpointing of SkelcastModule models. 
+    It uses datasets for training and validation, and includes functionality for batch processing, 
+    gradient logging, and checkpoint management.
+
+    Attributes:
+        train_set (Dataset): The dataset for training.
+        val_set (Dataset): The dataset for validation.
+        train_batch_size (int): Batch size for the training dataset.
+        val_batch_size (int): Batch size for the validation dataset.
+        block_size (int): Block size used for collating batch data.
+        model (SkelcastModule): The model to be trained and validated.
+        optimizer (torch.optim.Optimizer): Optimizer for model training.
+        n_epochs (int): Number of epochs to train the model.
+        device (str): The device ('cpu' or 'cuda') on which to run the model.
+        checkpoint_dir (str): Directory to save checkpoints.
+        checkpoint_frequency (int): Frequency (in epochs) at which to save checkpoints.
+        logger (BaseLogger): Logger for recording training and validation metrics.
+        log_gradient_info (bool): Flag to determine if gradient information is logged.
+
+    Methods:
+        setup(): Prepares the runner for training and validation.
+        fit(): Starts the training process from epoch 0.
+        resume(checkpoint_path): Resumes training from a saved checkpoint.
+        training_step(train_batch): Executes a single training step.
+        validation_step(val_batch): Executes a single validation step.
+        _run_epochs(start_epoch): Runs training and validation for specified epochs.
+        _run_phase(phase, epoch): Runs a training or validation phase for a single epoch.
+        _log_epoch_loss(phase, epoch): Logs the loss for a completed epoch.
+        _restore_state(checkpoint): Restores the state of the model and optimizer from a checkpoint.
+        _compile_results(): Compiles and returns training and validation results.
+
+    Note:
+        - This class requires a properly formatted SkelcastModule model and corresponding datasets.
+        - The checkpoint directory must exist before initializing the Runner.
+        - Logging and checkpointing are optional and can be configured as needed.
+
+    Raises:
+        AssertionError: If the checkpoint directory does not exist.
+    """
     def __init__(self,
                  train_set: Dataset,
                  val_set: Dataset,
@@ -24,7 +66,8 @@ class Runner:
                  device: str = 'cpu',
                  checkpoint_dir: str = None,
                  checkpoint_frequency: int = 1,
-                 logger: BaseLogger = None) -> None:
+                 logger: BaseLogger = None,
+                 log_gradient_info: bool = False) -> None:
         self.train_set = train_set
         self.val_set = val_set
         self.train_batch_size = train_batch_size
@@ -62,6 +105,7 @@ class Runner:
         self.checkpoint_callback = CheckpointCallback(checkpoint_dir=self.checkpoint_dir,
                                                       frequency=self.checkpoint_frequency)
         self.logger = logger
+        self.log_gradient_info = log_gradient_info
 
     def setup(self):
         self.model.to(self.device)
@@ -132,11 +176,26 @@ class Runner:
         # Cast them to a torch float32 and move them to the gpu
         x, y = x.to(torch.float32), y.to(torch.float32)
         x, y = x.to(self.device), y.to(self.device)
-
+        self.model.train()
         out = self.model.training_step(x, y)
         loss = out['loss']
         self.optimizer.zero_grad()
         loss.backward()
+        if self.log_gradient_info:
+        # Get the gradient flow and update norm ratio
+            self.model.gradient_flow()
+            self.model.compute_gradient_update_norm(lr=self.optimizer.param_groups[0]['lr'])
+            grad_hists = self.model.get_gradient_histograms()
+            # Log the gradient histograms to the logger
+            if self.logger is not None:
+                for name, hist in grad_hists.items():
+                    self.logger.add_histogram(tag=f'gradient/hists/{name}_grad_hist', values=hist, global_step=len(self.training_loss_per_step))
+
+            # Log the gradient updates to the logger
+            if self.logger is not None:
+                for name, ratio in self.model.gradient_update_ratios.items():
+                    self.logger.add_scalar(tag=f'gradient/{name}_grad_update_norm_ratio', scalar_value=ratio, global_step=len(self.training_loss_per_step))
+
         self.optimizer.step()
         # Print the loss
         self.training_loss_per_step.append(loss.item())
@@ -149,7 +208,7 @@ class Runner:
         # Cast them to a torch float32 and move them to the gpu
         x, y = x.to(torch.float32), y.to(torch.float32)
         x, y = x.to(self.device), y.to(self.device)
-
+        self.model.eval()
         out = self.model.validation_step(x, y)
         loss = out['loss']
         self.validation_loss_per_step.append(loss.item())

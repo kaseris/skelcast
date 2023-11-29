@@ -71,37 +71,61 @@ class Runner:
         self.console_callback.training_batches = self._total_train_batches
         self.console_callback.validation_batches = self._total_val_batches
 
-
-    def fit(self):
-        for epoch in range(self.n_epochs):
+    def _run_epochs(self, start_epoch):
+        for epoch in range(start_epoch, self.n_epochs):
             self.console_callback.on_epoch_start(epoch=epoch)
-            for train_batch_idx, train_batch in enumerate(self.train_loader):
-                self.training_step(train_batch=train_batch)
-                self.console_callback.on_batch_end(batch_idx=train_batch_idx,
-                                                   loss=self.training_loss_per_step[-1],
-                                                   phase='train')
-            epoch_loss = sum(self.training_loss_per_step[epoch * self._total_train_batches:(epoch + 1) * self._total_train_batches]) / self._total_train_batches
-            self.console_callback.on_epoch_end(epoch=epoch,
-                                               epoch_loss=epoch_loss, phase='train')
-            self.logger.add_scalar(tag='train/epoch_loss', scalar_value=epoch_loss, global_step=epoch)
-            self.training_loss_history.append(epoch_loss)
-            for val_batch_idx, val_batch in enumerate(self.val_loader):
-                self.validation_step(val_batch=val_batch)
-                self.console_callback.on_batch_end(batch_idx=val_batch_idx,
-                                                   loss=self.validation_loss_per_step[-1],
-                                                   phase='val')
-            epoch_loss = sum(self.validation_loss_per_step[epoch * self._total_val_batches:(epoch + 1) * self._total_val_batches]) / self._total_val_batches
-            self.console_callback.on_epoch_end(epoch=epoch, epoch_loss=epoch_loss, phase='val')
-            self.validation_loss_history.append(epoch_loss)
+            self._run_phase('train', epoch)
+            self._log_epoch_loss('train', epoch)
+            self._run_phase('val', epoch)
+            self._log_epoch_loss('val', epoch)
             self.checkpoint_callback.on_epoch_end(epoch=epoch, runner=self)
-            self.logger.add_scalar(tag='val/epoch_loss', scalar_value=epoch_loss, global_step=epoch)
 
+    def _run_phase(self, phase, epoch):
+        loader = self.train_loader if phase == 'train' else self.val_loader
+        step_method = self.training_step if phase == 'train' else self.validation_step
+        loss_per_step = self.training_loss_per_step if phase == 'train' else self.validation_loss_per_step
+
+        for batch_idx, batch in enumerate(loader):
+            step_method(batch)
+            self.console_callback.on_batch_end(batch_idx=batch_idx,
+                                               loss=loss_per_step[-1],
+                                               phase=phase)
+            
+    def _log_epoch_loss(self, phase, epoch):
+        loss_per_step = self.training_loss_per_step if phase == 'train' else self.validation_loss_per_step
+        total_batches = self._total_train_batches if phase == 'train' else self._total_val_batches
+        epoch_loss = sum(loss_per_step[epoch * total_batches:(epoch + 1) * total_batches]) / total_batches
+        self.console_callback.on_epoch_end(epoch=epoch, epoch_loss=epoch_loss, phase=phase)
+        history = self.training_loss_history if phase == 'train' else self.validation_loss_history
+        history.append(epoch_loss)
+        self.logger.add_scalar(tag=f'{phase}/epoch_loss', scalar_value=epoch_loss, global_step=epoch)
+
+    def resume(self, checkpoint_path):
+        checkpoint = torch.load(checkpoint_path)
+        self._restore_state(checkpoint)
+        start_epoch = checkpoint.get('epoch', 0) + 1
+        self._run_epochs(start_epoch)
+        return self._compile_results()
+    
+    def _restore_state(self, checkpoint):
+        self.model.load_state_dict(checkpoint.get('model_state_dict'))
+        self.optimizer.load_state_dict(checkpoint.get('optimizer_state_dict'))
+        self.training_loss_history = checkpoint.get('training_loss_history')
+        self.validation_loss_history = checkpoint.get('validation_loss_history')
+        self.training_loss_per_step = checkpoint.get('training_loss_per_step', [])
+        self.validation_loss_per_step = checkpoint.get('validation_loss_per_step', [])
+
+    def _compile_results(self):
         return {
             'training_loss_history': self.training_loss_history,
             'training_loss_per_step': self.training_loss_per_step,
             'validation_loss_history': self.validation_loss_history,
             'validation_loss_per_step': self.validation_loss_per_step
         }
+
+    def fit(self):
+        self._run_epochs(start_epoch=0)
+        return self._compile_results()
 
     def training_step(self, train_batch: NTURGBDSample):
         x, y = train_batch.x, train_batch.y
@@ -132,63 +156,4 @@ class Runner:
         # Log it to the logger
         if self.logger is not None:
             self.logger.add_scalar(tag='val/step_loss', scalar_value=loss.item(), global_step=len(self.validation_loss_per_step))
-    
-    def resume(self, checkpoint_path):
-        """
-        Resumes training from a saved checkpoint.
-
-        Args:
-        
-        - checkpoint_path: Path to the checkpoint file.
-        """
-        # Load the checkpoint
-        checkpoint = torch.load(checkpoint_path)
-        
-        # Restore the previous' epoch's state
-        self.model.load_state_dict(checkpoint.get('model_state_dict'))
-        self.optimizer.load_state_dict(checkpoint.get('optimizer_state_dict'))
-        self.training_loss_history = checkpoint.get('training_loss_history')
-        self.validation_loss_history = checkpoint.get('validation_loss_history')
-        self.training_loss_per_step = checkpoint.get('training_loss_per_step', [])
-        self.validation_loss_per_step = checkpoint.get('validation_loss_per_step', [])
-        
-        # Set the current epoch to the loaded epoch and start from the next
-        start_epoch = checkpoint.get('epoch', 0) + 1
-        
-        # resume the training
-        for epoch in range(start_epoch, self.n_epochs):
-            self.console_callback.on_epoch_start(epoch=epoch)
-            for train_batch_idx, train_batch in enumerate(self.train_loader):
-                self.training_step(train_batch=train_batch)
-                self.console_callback.on_batch_end(batch_idx=train_batch_idx,
-                                                   loss=self.training_loss_per_step[-1],
-                                                   phase='train')
-                if self.logger is not None:
-                    self.logger.add_scalar(tag='train/step_loss', scalar_value=self.training_loss_per_step[-1], global_step=len(self.training_loss_per_step))
-            epoch_loss = sum(self.training_loss_per_step[epoch * self._total_train_batches:(epoch + 1) * self._total_train_batches]) / self._total_train_batches
-            self.console_callback.on_epoch_end(epoch=epoch,
-                                               epoch_loss=epoch_loss, phase='train')
-            self.training_loss_history.append(epoch_loss)
-            if self.logger is not None:
-                self.logger.add_scalar(tag='train/epoch_loss', scalar_value=epoch_loss, global_step=epoch)
-            for val_batch_idx, val_batch in enumerate(self.val_loader):
-                self.validation_step(val_batch=val_batch)
-                self.console_callback.on_batch_end(batch_idx=val_batch_idx,
-                                                   loss=self.validation_loss_per_step[-1],
-                                                   phase='val')
-                if self.logger is not None:
-                    self.logger.add_scalar(tag='val/step_loss', scalar_value=self.validation_loss_per_step[-1], global_step=len(self.validation_loss_per_step))
-            epoch_loss = sum(self.validation_loss_per_step[epoch * self._total_val_batches:(epoch + 1) * self._total_val_batches]) / self._total_val_batches
-            self.console_callback.on_epoch_end(epoch=epoch, epoch_loss=epoch_loss, phase='val')
-            self.validation_loss_history.append(epoch_loss)
-            if self.logger is not None:
-                self.logger.add_scalar(tag='val/epoch_loss', scalar_value=epoch_loss, global_step=epoch)
-            self.checkpoint_callback.on_epoch_end(epoch=epoch, runner=self)
-
-        return {
-            'training_loss_history': self.training_loss_history,
-            'training_loss_per_step': self.training_loss_per_step,
-            'validation_loss_history': self.validation_loss_history,
-            'validation_loss_per_step': self.validation_loss_per_step
-        }
         

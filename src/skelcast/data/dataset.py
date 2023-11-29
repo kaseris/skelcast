@@ -132,8 +132,9 @@ class NTURGBDCollateFn:
         batch_y = []
         for sample, _ in batch:
             x, y = self.get_windows(sample)
-            batch_x.append(x)
-            batch_y.append(y)
+            chunk_size, context_len, n_bodies, n_joints, n_dims = x.shape
+            batch_x.append(x.view(chunk_size, context_len, n_bodies * n_joints * n_dims))
+            batch_y.append(y.view(chunk_size, context_len, n_bodies * n_joints * n_dims))
         # Pad the sequences to the maximum sequence length in the batch
         batch_x = torch.nn.utils.rnn.pad_sequence(batch_x, batch_first=True)
         batch_y = torch.nn.utils.rnn.pad_sequence(batch_y, batch_first=True)

@@ -19,40 +19,45 @@ class Runner:
     It uses datasets for training and validation, and includes functionality for batch processing, 
     gradient logging, and checkpoint management.
 
-    Attributes:
-        train_set (Dataset): The dataset for training.
-        val_set (Dataset): The dataset for validation.
-        train_batch_size (int): Batch size for the training dataset.
-        val_batch_size (int): Batch size for the validation dataset.
-        block_size (int): Block size used for collating batch data.
-        model (SkelcastModule): The model to be trained and validated.
-        optimizer (torch.optim.Optimizer): Optimizer for model training.
-        n_epochs (int): Number of epochs to train the model.
-        device (str): The device ('cpu' or 'cuda') on which to run the model.
-        checkpoint_dir (str): Directory to save checkpoints.
-        checkpoint_frequency (int): Frequency (in epochs) at which to save checkpoints.
-        logger (BaseLogger): Logger for recording training and validation metrics.
-        log_gradient_info (bool): Flag to determine if gradient information is logged.
+
+    Args:
+    ---
+    -    `train_set` (Dataset): The dataset for training.
+    -    `val_set` (Dataset): The dataset for validation.
+    -    `train_batch_size` (int): Batch size for the training dataset.
+    -    `val_batch_size` (int): Batch size for the validation dataset.
+    -    `block_size` (int): Block size used for collating batch data.
+    -    `model` (SkelcastModule): The model to be trained and validated.
+    -    `optimizer` (torch.optim.Optimizer): Optimizer for model training.
+    -    `n_epochs` (int): Number of epochs to train the model.
+    -    `device` (str): The device ('cpu' or 'cuda') on which to run the model.
+    -    `checkpoint_dir` (str): Directory to save checkpoints.
+    -    `checkpoint_frequency` (int): Frequency (in epochs) at which to save checkpoints.
+    -    `logger` (BaseLogger): Logger for recording training and validation metrics.
+    -    `log_gradient_info` (bool): Flag to determine if gradient information is logged.
 
     Methods:
-        setup(): Prepares the runner for training and validation.
-        fit(): Starts the training process from epoch 0.
-        resume(checkpoint_path): Resumes training from a saved checkpoint.
-        training_step(train_batch): Executes a single training step.
-        validation_step(val_batch): Executes a single validation step.
-        _run_epochs(start_epoch): Runs training and validation for specified epochs.
-        _run_phase(phase, epoch): Runs a training or validation phase for a single epoch.
-        _log_epoch_loss(phase, epoch): Logs the loss for a completed epoch.
-        _restore_state(checkpoint): Restores the state of the model and optimizer from a checkpoint.
-        _compile_results(): Compiles and returns training and validation results.
+    ---
+    -    `setup()`: Prepares the runner for training and validation.
+    -    `fit()`: Starts the training process from epoch 0.
+    -    `resume(checkpoint_path)`: Resumes training from a saved checkpoint.
+    -    `training_step(train_batch)`: Executes a single training step.
+    -    `validation_step(val_batch)`: Executes a single validation step.
+    -    `_run_epochs(start_epoch)`: Runs training and validation for specified epochs.
+    -    `_run_phase(phase, epoch)`: Runs a training or validation phase for a single epoch.
+    -    `_log_epoch_loss(phase, epoch)`: Logs the loss for a completed epoch.
+    -    `_restore_state(checkpoint)`: Restores the state of the model and optimizer from a checkpoint.
+    -    `_compile_results()`: Compiles and returns training and validation results.
 
     Note:
+    ---
         - This class requires a properly formatted SkelcastModule model and corresponding datasets.
         - The checkpoint directory must exist before initializing the Runner.
         - Logging and checkpointing are optional and can be configured as needed.
 
     Raises:
-        AssertionError: If the checkpoint directory does not exist.
+    ---
+        `AssertionError`: If the checkpoint directory does not exist.
     """
     def __init__(self,
                  train_set: Dataset,
@@ -62,6 +67,7 @@ class Runner:
                  block_size: int,
                  model: SkelcastModule,
                  optimizer: torch.optim.Optimizer = None,
+                 lr: float = 1e-4,
                  n_epochs: int = 10,
                  device: str = 'cpu',
                  checkpoint_dir: str = None,
@@ -77,11 +83,12 @@ class Runner:
         self.train_loader = DataLoader(dataset=self.train_set, batch_size=self.train_batch_size, shuffle=True, collate_fn=self._collate_fn)
         self.val_loader = DataLoader(dataset=self.val_set, batch_size=self.val_batch_size, shuffle=False, collate_fn=self._collate_fn)
         self.model = model
+        self.lr = lr
 
         if optimizer is not None:
             self.optimizer = optimizer
         else:
-            self.optimizer = optim.AdamW(self.model.parameters(), lr=1e-5)
+            self.optimizer = optim.AdamW(self.model.parameters(), lr=lr)
 
         self.training_loss_history = []
         self.training_loss_per_step = []

@@ -5,7 +5,10 @@ from torch.nn.utils.rnn import PackedSequence
 from typing import Union
 
 from skelcast.models import SkelcastModule
+from skelcast.models import MODELS
 
+
+@MODELS.register_module()
 class SimpleLSTMRegressor(SkelcastModule):
     def __init__(self,
                  hidden_size,

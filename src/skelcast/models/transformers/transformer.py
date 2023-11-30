@@ -3,7 +3,10 @@ import torch.nn as nn
 
 import skelcast.models.transformers.base as base
 from skelcast.models import SkelcastModule
+from skelcast.models import MODELS
 
+
+@MODELS.register_module()
 class ForecastTransformer(SkelcastModule):
     def __init__(self) -> None:
         super().__init__()

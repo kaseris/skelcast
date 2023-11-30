@@ -15,6 +15,7 @@ from .prepare_data import (
     should_blacklist,
 )
 
+from skelcast.data import DATASETS, COLLATE_FUNCS
 
 def read_skeleton_file(
     file_path, save_skelxyz=True, save_rgbxy=True, save_depthxy=True
@@ -102,6 +103,7 @@ def nturbgd_collate_fn_with_overlapping_context_window(batch: List[NTURGBDSample
     return NTURGBDSample(x=batch_x, y=batch_y, label=batch_label)
 
 
+@COLLATE_FUNCS.register_module()
 class NTURGBDCollateFn:
     """
     Custom collate function for batched variable-length sequences.
@@ -159,6 +161,7 @@ class NTURGBDCollateFn:
         return input_windows_tensor, target_labels_tensor
         
 
+@DATASETS.register_module()
 class NTURGBDDataset(Dataset):
     def __init__(
         self,

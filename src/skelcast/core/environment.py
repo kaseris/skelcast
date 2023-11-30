@@ -1,3 +1,4 @@
+import os
 import logging
 
 import randomname
@@ -112,10 +113,3 @@ class Environment:
         else:
             return self._runner.resume(os.path.join(self.checkpoint_dir, self._experiment_name))
 
-if __name__ == '__main__':
-    env = Environment()
-    import os
-    import os.path as osp
-    logging.basicConfig(level=logging.INFO)
-    env.build_from_file(osp.join(os.getcwd(), 'configs/lstm_regressor_1024x1024.yaml'))
-    env.run()

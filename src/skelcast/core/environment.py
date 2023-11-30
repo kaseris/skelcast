@@ -11,7 +11,6 @@ from torch.utils.data import random_split
 from skelcast.models import MODELS
 from skelcast.data import DATASETS
 from skelcast.data import TRANSFORMS
-from skelcast.data import COLLATE_FUNCS
 from skelcast.logger import LOGGERS
 
 from skelcast.experiments.runner import Runner
@@ -85,6 +84,7 @@ class Environment:
         _args['model'] = self._model
         _args['train_set'] = self._train_dataset
         _args['val_set'] = self._val_dataset
+        _args['checkpoint_dir'] = os.path.join(self.checkpoint_dir, self._experiment_name)
         self._runner = Runner(**_args)
         self._runner.setup()
         logging.log(logging.INFO, 'Runner setup complete.')

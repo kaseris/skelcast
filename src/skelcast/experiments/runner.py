@@ -66,6 +66,7 @@ class Runner:
                  block_size: int,
                  model: SkelcastModule,
                  optimizer: torch.optim.Optimizer = None,
+                 lr: float = 1e-4,
                  n_epochs: int = 10,
                  device: str = 'cpu',
                  checkpoint_dir: str = None,
@@ -81,11 +82,12 @@ class Runner:
         self.train_loader = DataLoader(dataset=self.train_set, batch_size=self.train_batch_size, shuffle=True, collate_fn=self._collate_fn)
         self.val_loader = DataLoader(dataset=self.val_set, batch_size=self.val_batch_size, shuffle=False, collate_fn=self._collate_fn)
         self.model = model
+        self.lr = lr
 
         if optimizer is not None:
             self.optimizer = optimizer
         else:
-            self.optimizer = optim.AdamW(self.model.parameters(), lr=1e-5)
+            self.optimizer = optim.AdamW(self.model.parameters(), lr=lr)
 
         self.training_loss_history = []
         self.training_loss_per_step = []

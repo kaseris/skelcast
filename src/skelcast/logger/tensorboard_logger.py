@@ -1,7 +1,10 @@
 from torch.utils.tensorboard import SummaryWriter
 from skelcast.logger.base import BaseLogger
 
+from skelcast.logger import LOGGERS
 
+
+@LOGGERS.register_module()
 class TensorboardLogger(BaseLogger):
     def __init__(self, log_dir):
         super().__init__()

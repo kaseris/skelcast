@@ -18,6 +18,36 @@ from skelcast.experiments.runner import Runner
 torch.manual_seed(133742069)
 
 class Environment:
+    """
+    The Environment class is designed to set up and manage the environment for training machine learning models.
+    It includes methods for building models, datasets, loggers, and runners based on specified configurations.
+    
+    Attributes:
+        _experiment_name (str): A randomly generated name for the experiment.
+        checkpoint_dir (str): Directory path for storing model checkpoints.
+        data_dir (str): Directory path where the dataset is located.
+        config (dict, optional): Configuration settings for the model, dataset, logger, and runner.
+        _model (object, optional): The instantiated machine learning model.
+        _dataset (object, optional): The complete dataset.
+        _train_dataset (object, optional): The training subset of the dataset.
+        _val_dataset (object, optional): The validation subset of the dataset.
+        _runner (object, optional): The training runner.
+        _logger (object, optional): The logger for recording experiment results.
+
+    Methods:
+        experiment_name: Property that returns the experiment name.
+        build_from_file(config_path): Parses the configuration file and builds the dataset, model, logger, and runner.
+        run(): Starts the training process, either from scratch or by resuming from the latest checkpoint.
+
+    Usage:
+        1. Initialize the Environment with data and checkpoint directories.
+        2. Call `build_from_file` with the path to a configuration file.
+        3. Use `run` to start the training process.
+
+    Note:
+        This class is highly dependent on external modules and configurations. Ensure that all required modules
+        and configurations are properly set up before using this class.
+    """
     def __init__(self, data_dir: str = '/home/kaseris/Documents/data_ntu_rbgd',
                  checkpoint_dir = '/home/kaseris/Documents/checkpoints_forecasting') -> None:
         self._experiment_name = randomname.get_name()
@@ -112,4 +142,3 @@ class Environment:
             return self._runner.fit()
         else:
             return self._runner.resume(os.path.join(self.checkpoint_dir, self._experiment_name))
-

@@ -1,5 +1,6 @@
 import sys
 import time
+from datetime import datetime
 
 from skelcast.callbacks.callback import Callback
 
@@ -47,8 +48,10 @@ class ConsoleCallback(Callback):
             print()
 
     def _print_status(self):
+        now = datetime.now()
+        now_formatted = now.strftime("[%Y-%m-%d %H:%M:%S]")
         clear_line = '\r' + ' ' * 80  # Create a line of 80 spaces
-        message = f"Epoch: {self.current_epoch + 1}/{self.final_epoch}, Batch: {self.current_batch}/{self.total_batches}, Train Loss: {self.latest_train_loss}, Val Loss: {self.latest_val_loss}"
+        message = f"{now_formatted} Epoch: {self.current_epoch + 1}/{self.final_epoch}, Batch: {self.current_batch}/{self.total_batches}, Train Loss: {self.latest_train_loss}, Val Loss: {self.latest_val_loss}"
         
         # First, print the clear_line to overwrite the previous output, then print your message
         print(f'{clear_line}\r{message}', end='')

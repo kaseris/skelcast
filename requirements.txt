@@ -4,3 +4,6 @@ scikit-learn
 pytest
 pytest-cov
 matplotlib
+randomname
+pyyaml
+tensorboard

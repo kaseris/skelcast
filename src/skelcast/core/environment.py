@@ -115,15 +115,16 @@ class Environment:
         _args['train_set'] = self._train_dataset
         _args['val_set'] = self._val_dataset
         _args['checkpoint_dir'] = os.path.join(self.checkpoint_dir, self._experiment_name)
+        self._create_checkpoint_dir()
         self._runner = Runner(**_args)
         self._runner.setup()
         logging.log(logging.INFO, 'Runner setup complete.')
 
     def _create_checkpoint_dir(self) -> None:
         if os.path.exists(os.path.join(self.checkpoint_dir, self._experiment_name)):
-            raise ValueError(f'Checkpoint directory {self.checkpoint_dir} already exists.')
+            raise ValueError(f'Checkpoint directory {os.path.join(self.checkpoint_dir, self._experiment_name)} already exists.')
         else:
-            logging.log(logging.INFO, f'Creating checkpoint directory: {self.checkpoint_dir}.')
+            logging.log(logging.INFO, f'Creating checkpoint directory: {os.path.join(self.checkpoint_dir, self._experiment_name)}.')
             os.mkdir(os.path.join(self.checkpoint_dir, self._experiment_name))
 
     def _parse_file(self, fname: str) -> None:
@@ -137,8 +138,4 @@ class Environment:
         # Else, create a new checkpoint directory and start training
         # If there's not a checkpoint directory, use the self._runner.fit() method
         # Otherwise, use the self._runner.resume(path_to_checkpoint) method
-        if not os.path.exists(os.path.join(self.checkpoint_dir, self._experiment_name)):
-            self._create_checkpoint_dir()
-            return self._runner.fit()
-        else:
-            return self._runner.resume(os.path.join(self.checkpoint_dir, self._experiment_name))
+        return self._runner.fit()

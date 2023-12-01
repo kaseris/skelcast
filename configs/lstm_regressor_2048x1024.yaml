@@ -1,0 +1,42 @@
+dataset:
+  name: 'NTURGBDDataset'
+  args:
+    missing_files_dir: 'data/missing'
+    label_file: 'data/labels.txt'
+    max_context_window: 10
+    max_number_of_bodies: 1
+    transforms:
+      name: 'MinMaxScaleTransform'
+      args:
+        feature_scale: [0.0, 1.0]
+    max_duration: 300
+    n_joints: 25
+
+# Set the train data percentage
+train_data_percentage: 0.8
+
+model:
+  name: 'SimpleLSTMRegressor'
+  args:
+    hidden_size: 2048
+    num_layers: 2
+    linear_out: 1024
+    reduction: 'mean'
+    batch_first: true
+    n_joints: 25
+    n_dims: 3
+
+runner:
+  args:
+    val_batch_size: 32
+    train_batch_size: 32
+    block_size: 8
+    device: 'cuda'
+    logger:
+      name: 'TensorboardLogger'
+      args:
+        save_dir: 'runs'
+    checkpoint_dir: '/home/kaseris/Documents/checkpoints_forecasting'
+    n_epochs: 10
+    lr: 0.00001
+    log_gradient_info: true

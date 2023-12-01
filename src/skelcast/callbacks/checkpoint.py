@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import torch
 
 from skelcast.callbacks.callback import Callback
@@ -38,6 +40,9 @@ class CheckpointCallback(Callback):
         - runner (Runner): The experiment runner instance
         - epoch (int): The current epoch
         """
+        now = datetime.now()
+        formatted_time = now.strftime("%Y-%m-%d_%H%M%S")
+
         checkpoint = {
             'epoch': epoch,
             'model_state_dict': runner.model.state_dict(),
@@ -48,6 +53,6 @@ class CheckpointCallback(Callback):
             'validation_loss_per_step': runner.validation_loss_per_step
         }
         
-        checkpoint_path = f'{self.checkpoint_dir}/checkpoint_epoch_{epoch}.pt'
+        checkpoint_path = f'{self.checkpoint_dir}/checkpoint_epoch_{epoch}_{formatted_time}.pt'
         torch.save(checkpoint, checkpoint_path)
         

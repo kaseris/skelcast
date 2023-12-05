@@ -7,3 +7,4 @@ matplotlib
 randomname
 pyyaml
 tensorboard
+discord

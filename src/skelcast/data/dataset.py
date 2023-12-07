@@ -1,4 +1,6 @@
 import os
+import logging
+import pickle
 from dataclasses import dataclass
 from typing import Any, Tuple, List
 
@@ -172,7 +174,8 @@ class NTURGBDDataset(Dataset):
         max_number_of_bodies: int = 4,
         max_duration: int = 300,
         n_joints: int = 25,
-        transforms: Any = None
+        transforms: Any = None,
+        cache_file: str = None,
     ) -> None:
         self.data_directory = data_directory
         self.missing_files_dir = missing_files_dir
@@ -191,11 +194,21 @@ class NTURGBDDataset(Dataset):
             missing_skeleton_names=missing_files, skeleton_files=self.skeleton_files
         )
         self.skeleton_files_clean = []
-        for fname in self.skeleton_files:
-            if should_blacklist(fname):
-                continue
-            else:
-                self.skeleton_files_clean.append(fname)
+
+        if cache_file is None:
+            for fname in self.skeleton_files:
+                if should_blacklist(fname):
+                    continue
+                else:
+                    self.skeleton_files_clean.append(fname)
+        else:
+            # Check if cache file exists and then unpickle it and store its data to self.skeleton_files_clean
+            if os.path.exists(cache_file):
+                # log that we are loading the cache file
+                logging.info(f"Loading cache file {cache_file}...")
+                with open(cache_file, 'rb') as f:
+                    self.skeleton_files_clean = pickle.load(f)
+
 
     def load_labels(self):
         with open(self.labels_file, 'r') as f:
@@ -236,3 +249,8 @@ class NTURGBDDataset(Dataset):
 
     def __len__(self):
         return len(self.skeleton_files_clean)
+    
+    def store_to_cache(self, cache_file: str) -> None:
+        with open(cache_file, 'wb') as f:
+            pickle.dump(self.skeleton_files_clean, f)
+        logging.info(f"Stored {len(self.skeleton_files_clean)} files to cache file {cache_file}.")

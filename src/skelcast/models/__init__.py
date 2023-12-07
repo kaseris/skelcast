@@ -5,3 +5,4 @@ MODELS = Registry()
 
 from .rnn.lstm import SimpleLSTMRegressor
 from .transformers.transformer import ForecastTransformer
+from .rnn.pvred import PositionalVelocityRecurrentEncoderDecoder

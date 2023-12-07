@@ -115,10 +115,11 @@ class PositionalVelocityRecurrentEncoderDecoder(SkelcastModule):
     import torch
     from skelcast.models.rnn.pvred import PositionalVelocityRecurrentEncoderDecoder
 
-    model = PositionalVelocityRecurrentEncoderDecoder(input_dim = 75)
+    model = PositionalVelocityRecurrentEncoderDecoder(input_dim = 75, observe_until=80)
     x = torch.randn(32, 100, 75)
-    y = torch.randn(32, 100, 75)
-    dec_out, loss = model(x, y)
+    dec_out, loss = model(x)
+    dec_out.shape
+    >>> torch.Size([32, 20, 75])
     ```
     """
     def __init__(self, input_dim: int, enc_hidden_dim: int = 64,

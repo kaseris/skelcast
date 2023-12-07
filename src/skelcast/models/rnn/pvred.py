@@ -1,11 +1,12 @@
 import torch
 import torch.nn as nn
 
-from skelcast.models import MODELS
+from skelcast.models import MODELS, ENCODERS, DECODERS
 from skelcast.models.module import SkelcastModule
 from skelcast.models.transformers.base import PositionalEncoding
 
 
+@ENCODERS.register_module()
 class Encoder(nn.Module):
     def __init__(self, rnn_type: str = 'rnn',
                  input_dim: int = 75,
@@ -35,6 +36,7 @@ class Encoder(nn.Module):
         return out, hidden
 
 
+@DECODERS.register_module()
 class Decoder(nn.Module):
     def __init__(self,rnn_type: str = 'rnn',
                  input_dim: int = 75,
@@ -55,13 +57,17 @@ class Decoder(nn.Module):
         self.linear = nn.Linear(hidden_dim, input_dim)
         self.dropout = nn.Dropout(dropout)
     
-    def forward(self, x: torch.Tensor, hidden: torch.Tensor = None) -> torch.Tensor:
-        out, _ = self.rnn(x, hidden)
-        out = self.dropout(out)
-        out = self.linear(out)
-        if self.use_residual:
-            out = out + x
-        return out
+    def forward(self, x: torch.Tensor, hidden: torch.Tensor = None, timesteps_to_predict: int = 5) -> torch.Tensor:
+        predictions = []
+        for _ in range(timesteps_to_predict):
+            out, hidden = self.rnn(x, hidden)
+            out = self.dropout(out)
+            out = self.linear(out)
+            if self.use_residual:
+                out = out + x
+            predictions.append(out)
+            x = out
+        return torch.cat(predictions, dim=1)
         
 
 @MODELS.register_module()
@@ -96,6 +102,7 @@ class PositionalVelocityRecurrentEncoderDecoder(SkelcastModule):
     - `std_thresh` (`float`): Threshold for the standard deviation of the input
     - `use_std_mask` (`bool`): Flag to indicate whether to use the standard deviation mask
     - `use_padded_len_mask` (`bool`): Flag to indicate whether to use the padded length mask
+    - `observe_until` (`int`): The number of frames to observe before predicting the future
 
     Returns:
     ---
@@ -124,7 +131,8 @@ class PositionalVelocityRecurrentEncoderDecoder(SkelcastModule):
                 batch_first: bool = True,
                 std_thresh: float = 1e-4,
                 use_std_mask: bool = False,
-                use_padded_len_mask: bool = False) -> None:
+                use_padded_len_mask: bool = False,
+                observe_until: int = 30) -> None:
         assert pos_enc in ['concat', 'add', None], f'pos_enc must be one of concat, add, None, got {pos_enc}'
         assert isinstance(loss_fn, nn.Module), f'loss_fn must be an instance of torch.nn.Module, got {type(loss_fn)}'
         assert enc_type in ['lstm', 'gru'], f'enc_type must be one of lstm, gru, got {enc_type}'
@@ -138,6 +146,7 @@ class PositionalVelocityRecurrentEncoderDecoder(SkelcastModule):
         self.std_thresh = std_thresh
         self.use_std_mask = use_std_mask
         self.use_padded_len_mask = use_padded_len_mask
+        self.observe_until = observe_until
 
         self.include_velocity = include_velocity
         if self.include_velocity:
@@ -155,6 +164,7 @@ class PositionalVelocityRecurrentEncoderDecoder(SkelcastModule):
         self.loss_fn = loss_fn
 
         # Build encoder
+        # TODO: Convert them to registry-type build
         self.encoder = Encoder(rnn_type=enc_type, input_dim=input_dim,
                                hidden_dim=enc_hidden_dim, batch_first=batch_first)
         # Build decoder
@@ -162,42 +172,41 @@ class PositionalVelocityRecurrentEncoderDecoder(SkelcastModule):
                                hidden_dim=dec_hidden_dim, batch_first=batch_first)
 
 
-    def forward(self, x: torch.Tensor, y: torch.Tensor, masks: torch.Tensor = None) -> torch.Tensor:
-        mask_pred = torch.std(x, dim=1) > self.std_thresh if self.batch_first else torch.std(x, dim=0) > self.std_thresh
+    def forward(self, x: torch.Tensor, masks: torch.Tensor = None) -> torch.Tensor:
         # Calculate the velocity if the include_velocity flag is true
         if self.include_velocity:
             vel_inp = self._calculate_velocity(x)
-            vel_target = self._calculate_velocity(y)
             # Concatenate the velocity to the input and the targets
             x = torch.cat([x, vel_inp], dim=-1)
-            y = torch.cat([y, vel_target], dim=-1)
 
         # If the pos_enc is not None, apply the positional encoding, dependent on the pos_enc_method
 
         if self.pos_enc is not None:
             if self.pos_enc_method == 'concat':
-                pass # TODO: Implement the concatenation of the positional encoding
+                raise NotImplementedError('Concat positional encoding is not implemented yet')
             elif self.pos_enc_method == 'add':
-                x += self.pos_enc.pe.repeat(1, x.shape[0], 1).permute(1, 0, 2)[:, :x.shape[1], :]
-                y += self.pos_enc.pe.repeat(1, y.shape[0], 1).permute(1, 0, 2)[:, :y.shape[1], :]
-        
+                x += self.pos_enc.pe.repeat(1, x.shape[0], 1).permute(1, 0, 2)
+
+        encoder_input, decoder_initial_value, targets = x[:, :self.observe_until, :], x[:, self.observe_until, :], x[:, self.observe_until:, :]
+        mask_pred = torch.std(x, dim=1) > self.std_thresh if self.batch_first else torch.std(x, dim=0) > self.std_thresh
         # Encode the input
-        enc_out, enc_hidden = self.encoder(x)
+        enc_out, enc_hidden = self.encoder(encoder_input)
         # Decode the output
-        dec_out = self.decoder(enc_out, enc_hidden)
+        dec_out = self.decoder(decoder_initial_value.unsqueeze(1), enc_hidden, timesteps_to_predict=targets.shape[1])
+
+        # The decoder's output should have a shape of (batch_size, seq_len, input_dim)
+        assert dec_out.shape == targets.shape, f'dec_out.shape must be equal to targets.shape, got {dec_out.shape} and {targets.shape}'
+        # Apply the padded length masks to the prediction
+        if self.use_padded_len_mask:
+            dec_out = dec_out * masks.float()
+        
+        # Apply the std masks to the prediction
+        if self.use_std_mask:
+            dec_out = dec_out * mask_pred.float()
 
         # Calculate the loss
-        loss = self.loss_fn(dec_out, y)
+        loss = self.loss_fn(dec_out, targets)
 
-        # Mask the loss
-        if self.use_std_mask:
-            loss = loss * mask_pred.float()
-        
-        # We mask the loss with the masks tensor if the use_padded_len_mask flag is true
-        # in order to suppress the loss contribution of the padded values
-        if self.use_padded_len_mask:
-            loss = loss * masks.float()
-                
         return dec_out, loss
     
     def _calculate_velocity(self, x: torch.Tensor) -> torch.Tensor:
@@ -206,12 +215,10 @@ class PositionalVelocityRecurrentEncoderDecoder(SkelcastModule):
 
         Args:
         ---
-
         - `x` (`torch.Tensor`): Input tensor of shape `(batch_size, seq_len, input_dim)`
         
         Returns:
         ---
-
         - Velocity tensor of shape (batch_size, seq_len, input_dim)
         """
         # Calculate the velocity

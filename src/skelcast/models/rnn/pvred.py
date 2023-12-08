@@ -156,10 +156,10 @@ class PositionalVelocityRecurrentEncoderDecoder(SkelcastModule):
 
         self.pos_enc_method = pos_enc
         if self.pos_enc_method == 'concat':
-            self.pos_enc = PositionalEncoding(input_dim, mode='concat')
+            self.pos_enc = PositionalEncoding(d_model=input_dim, mode='concat')
             self.input_dim = self.input_dim + input_dim
         elif self.pos_enc_method == 'add':
-            self.pos_enc = PositionalEncoding(input_dim, mode='add')
+            self.pos_enc = PositionalEncoding(d_model=input_dim, mode='add')
         else:
             self.pos_enc = None
         
@@ -167,10 +167,10 @@ class PositionalVelocityRecurrentEncoderDecoder(SkelcastModule):
 
         # Build encoder
         # TODO: Convert them to registry-type build
-        self.encoder = Encoder(rnn_type=enc_type, input_dim=input_dim,
+        self.encoder = Encoder(rnn_type=enc_type, input_dim=self.input_dim,
                                hidden_dim=enc_hidden_dim, batch_first=batch_first)
         # Build decoder
-        self.decoder = Decoder(rnn_type=dec_type, input_dim=input_dim,
+        self.decoder = Decoder(rnn_type=dec_type, input_dim=self.input_dim,
                                hidden_dim=dec_hidden_dim, batch_first=batch_first)
 
 

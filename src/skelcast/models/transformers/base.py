@@ -82,16 +82,16 @@ class PositionalEncoding(nn.Module):
             last_cos = torch.cos(position * div_term[-1])
             pe[:, -1] = last_cos.squeeze()
 
-        pe = pe.unsqueeze(0).transpose(0, 1)
+        pe = pe.unsqueeze(0)
         self.register_buffer('pe', pe)
 
     def forward(self, x):
         if self.mode == 'add':
             # Adds the positional encoding vector to the input embedding vector
-            x = x + self.pe[:x.size(0), :]
+            x = x + self.pe[:x.size(1), :].repeat(x.size(0), 1, 1)
         elif self.mode == 'concat':
             # Concatenates the positional encoding vector with the input embedding vector
-            x = torch.cat((x, self.pe[:x.size(0), :]), dim=-1)
+            x = torch.cat((x, self.pe[:, :x.size(1), :].repeat(x.size(0), 1, 1)), dim=-1)
         else:
             raise ValueError("Invalid mode. Choose 'add' or 'concat'.")
         return x

@@ -155,10 +155,11 @@ class PositionalVelocityRecurrentEncoderDecoder(SkelcastModule):
             self.input_dim = self.input_dim * 2
 
         self.pos_enc_method = pos_enc
-        if pos_enc == 'concat' or pos_enc == 'add':
-            self.pos_enc = PositionalEncoding(input_dim)
-            if pos_enc == 'concat':
-                self.input_dim = self.input_dim + input_dim
+        if self.pos_enc_method == 'concat':
+            self.pos_enc = PositionalEncoding(input_dim, mode='concat')
+            self.input_dim = self.input_dim + input_dim
+        elif self.pos_enc_method == 'add':
+            self.pos_enc = PositionalEncoding(input_dim, mode='add')
         else:
             self.pos_enc = None
         
@@ -183,10 +184,7 @@ class PositionalVelocityRecurrentEncoderDecoder(SkelcastModule):
         # If the pos_enc is not None, apply the positional encoding, dependent on the pos_enc_method
 
         if self.pos_enc is not None:
-            if self.pos_enc_method == 'concat':
-                raise NotImplementedError('Concat positional encoding is not implemented yet')
-            elif self.pos_enc_method == 'add':
-                x += self.pos_enc.pe.repeat(1, x.shape[0], 1).permute(1, 0, 2)
+            x = self.pos_enc(x)
 
         encoder_input, decoder_initial_value, targets = x[:, :self.observe_until, :], x[:, self.observe_until, :], x[:, self.observe_until:, :]
         mask_pred = torch.std(x, dim=1) > self.std_thresh if self.batch_first else torch.std(x, dim=0) > self.std_thresh

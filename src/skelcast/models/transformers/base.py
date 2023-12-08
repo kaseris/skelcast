@@ -60,8 +60,10 @@ class MultiHeadSelfAttention(nn.Module):
     
     
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model, max_len=5000):
+    def __init__(self, d_model, max_len=5000, mode='add'):
         super(PositionalEncoding, self).__init__()
+        self.mode = mode
+
         # Create a long enough 'PE' matrix with position and dimension indexes
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
@@ -76,18 +78,22 @@ class PositionalEncoding(nn.Module):
         if d_model % 2 == 0:
             pe[:, 1::2] = torch.cos(position * div_term)
         else:
-            # For odd d_model, the last cosine term needs to be calculated differently
             pe[:, 1::2] = torch.cos(position * div_term[:-1])
             last_cos = torch.cos(position * div_term[-1])
             pe[:, -1] = last_cos.squeeze()
 
         pe = pe.unsqueeze(0).transpose(0, 1)
-        # Registers pe as a buffer that should not be considered a model parameter.
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        # Adds the positional encoding vector to the input embedding vector
-        x = x + self.pe[:x.size(0), :]
+        if self.mode == 'add':
+            # Adds the positional encoding vector to the input embedding vector
+            x = x + self.pe[:x.size(0), :]
+        elif self.mode == 'concat':
+            # Concatenates the positional encoding vector with the input embedding vector
+            x = torch.cat((x, self.pe[:x.size(0), :]), dim=-1)
+        else:
+            raise ValueError("Invalid mode. Choose 'add' or 'concat'.")
         return x
     
 

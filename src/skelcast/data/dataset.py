@@ -2,7 +2,7 @@ import os
 import logging
 import pickle
 from dataclasses import dataclass
-from typing import Any, Tuple, List
+from typing import Any, Tuple, List, Optional
 
 import numpy as np
 import torch
@@ -92,6 +92,7 @@ class NTURGBDSample:
     x: torch.tensor
     y: torch.tensor
     label: Tuple[int, str]
+    mask: Optional[torch.tensor] = None
 
 def nturbgd_collate_fn_with_overlapping_context_window(batch: List[NTURGBDSample]) -> NTURGBDSample:
     # TODO: Normalize each sample individually along its 3 axes 
@@ -102,7 +103,7 @@ def nturbgd_collate_fn_with_overlapping_context_window(batch: List[NTURGBDSample
     # batch_x = default_collate(batch_x)
     # batch_y = default_collate(batch_y)
     batch_label = default_collate(batch_label)
-    return NTURGBDSample(x=batch_x, y=batch_y, label=batch_label)
+    return NTURGBDSample(x=batch_x, y=batch_y, label=batch_label, mask=None)
 
 
 @COLLATE_FUNCS.register_module()
@@ -161,7 +162,50 @@ class NTURGBDCollateFn:
         input_windows_tensor = torch.tensor(input_windows, dtype=torch.float)
         target_labels_tensor = torch.tensor(np.array(target_labels), dtype=torch.float)
         return input_windows_tensor, target_labels_tensor
+
+
+@COLLATE_FUNCS.register_module()
+class NTURGBDCollateFnWithRandomSampledContextWindow:
+    """
+    Custom collate function for batched variable-length sequences.
+    During the __call__ function, we creata `block_size`-long context windows, for each sequence in the batch.
+    If is_packed is True, we pack the padded sequences, otherwise we return the padded sequences as is.
+
+    Args:
+    - block_size (int): Sequence's context length.
+    - is_packed (bool): Whether to pack the padded sequence or not.
+
+    Returns:
+    
+    The batched padded sequences ready to be fed to a transformer or an lstm model.
+    """
+    def __init__(self, block_size: int) -> None:
+        self.block_size = block_size
         
+    def __call__(self, batch) -> NTURGBDSample:
+        # Pick a random index for each element of the batch and create a context window of size `block_size`
+        # around that index
+        # If the batch element's sequence length is less than `block_size`, then we sample the entire sequence
+        # Pick the random index using pytorch
+        seq_lens = [sample.shape[0] for sample, _ in batch]
+        labels = [label for _, label in batch]
+        pre_batch = []
+        for sample, _ in batch:
+            logging.debug(f'sample.shape: {sample.shape}')
+            if sample.shape[0] <= self.block_size:
+                # Sample the entire sequence
+                logging.debug(f'Detected a sample with a sample length of {sample.shape[0]}')
+                pre_batch.append(sample)
+            else:
+                # Sample a random index
+                idx = torch.randint(low=0, high=sample.shape[0] - self.block_size, size=(1,)).item()
+                pre_batch.append(sample[idx:idx + self.block_size, ...])
+        # Pad the sequences to the maximum sequence length in the batch
+        batch_x = torch.nn.utils.rnn.pad_sequence(pre_batch, batch_first=True)
+        # Generate masks
+        masks = torch.nn.utils.rnn.pack_sequence([torch.ones(seq_len) for seq_len in seq_lens], enforce_sorted=False).to(torch.float32)
+        return NTURGBDSample(x=batch_x, y=batch_x, label=labels, mask=masks)
+    
 
 @DATASETS.register_module()
 class NTURGBDDataset(Dataset):

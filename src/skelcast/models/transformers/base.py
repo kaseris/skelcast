@@ -60,23 +60,40 @@ class MultiHeadSelfAttention(nn.Module):
     
     
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model, max_len=5000):
+    def __init__(self, d_model, max_len=5000, mode='add'):
         super(PositionalEncoding, self).__init__()
+        self.mode = mode
+
         # Create a long enough 'PE' matrix with position and dimension indexes
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+
+        # Adjust div_term calculation
         div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
-        
+
+        # Assign sine to even and cosine to odd indices
         pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
         
-        pe = pe.unsqueeze(0).transpose(0, 1)
-        # Registers pe as a buffer that should not be considered a model parameter.
+        # Adjust cosine assignment for odd d_model
+        if d_model % 2 == 0:
+            pe[:, 1::2] = torch.cos(position * div_term)
+        else:
+            pe[:, 1::2] = torch.cos(position * div_term[:-1])
+            last_cos = torch.cos(position * div_term[-1])
+            pe[:, -1] = last_cos.squeeze()
+
+        pe = pe.unsqueeze(0)
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        # Adds the positional encoding vector to the input embedding vector
-        x = x + self.pe[:x.size(0), :]
+        if self.mode == 'add':
+            # Adds the positional encoding vector to the input embedding vector
+            x = x + self.pe[:x.size(1), :].repeat(x.size(0), 1, 1)
+        elif self.mode == 'concat':
+            # Concatenates the positional encoding vector with the input embedding vector
+            x = torch.cat((x, self.pe[:, :x.size(1), :].repeat(x.size(0), 1, 1)), dim=-1)
+        else:
+            raise ValueError("Invalid mode. Choose 'add' or 'concat'.")
         return x
     
 

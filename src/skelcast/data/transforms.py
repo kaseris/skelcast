@@ -1,7 +1,9 @@
 import torch
-from typing import Tuple
+from typing import Any, Tuple
 
 from skelcast.data import TRANSFORMS
+from skelcast.data.utils import xyz_to_expmap, exps_to_quats
+from skelcast.primitives.skeleton import KinectSkeleton
 
 
 @TRANSFORMS.register_module()
@@ -37,3 +39,40 @@ class MinMaxScaleTransform:
     @property
     def max(self) -> float:
         return self.max_
+    
+
+@TRANSFORMS.register_module()
+class CartToExpMapsTransform:
+
+    def __init__(self, parents: list = None) -> None:
+        if parents is None:
+            self.parents = KinectSkeleton.parent_scheme()
+        else:
+            self.parents = parents
+
+    def __call__(self, x) -> torch.Tensor:
+        return xyz_to_expmap(x, self.parents)
+
+
+@TRANSFORMS.register_module()
+class ExpMapToQuaternionTransform:
+
+    def __init__(self) -> None:
+        pass
+
+    def __call__(self, x) -> Any:
+        return exps_to_quats(x)
+    
+
+@TRANSFORMS.register_module()
+class CartToQuaternionTransform:
+
+    def __init__(self, parents: list = None) -> None:
+        if parents is None:
+            self.pareents = KinectSkeleton.parent_scheme()
+        else:
+            self.parents = parents
+
+    def __call__(self, x) -> Any:
+        _exps = xyz_to_expmap(x, self.pareents)
+        return exps_to_quats(_exps)

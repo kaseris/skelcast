@@ -94,3 +94,32 @@ class KinectSkeleton(IntEnum):
             (KinectSkeleton.KNEERIGHT, KinectSkeleton.ANKLERIGHT),
             (KinectSkeleton.ANKLERIGHT, KinectSkeleton.FOOTRIGHT),
         ]
+
+    def parent_scheme():
+        return [
+    0,  # SPINE_BASE (root, its own parent)
+    0,  # SPINE_MID's parent is SPINE_BASE
+    1,  # NECK's parent is SPINE_MID
+    2,  # HEAD's parent is NECK
+    1,  # SHOULDER_LEFT's parent is SPINE_MID
+    4,  # ELBOW_LEFT's parent is SHOULDER_LEFT
+    5,  # WRIST_LEFT's parent is ELBOW_LEFT
+    6,  # HAND_LEFT's parent is WRIST_LEFT
+    7,  # HAND_TIP_LEFT's parent is HAND_LEFT
+    7,  # THUMB_LEFT's parent is HAND_LEFT
+    1,  # SHOULDER_RIGHT's parent is SPINE_MID
+    10, # ELBOW_RIGHT's parent is SHOULDER_RIGHT
+    11, # WRIST_RIGHT's parent is ELBOW_RIGHT
+    12, # HAND_RIGHT's parent is WRIST_RIGHT
+    13, # HAND_TIP_RIGHT's parent is HAND_RIGHT
+    13, # THUMB_RIGHT's parent is HAND_RIGHT
+    0,  # HIP_LEFT's parent is SPINE_BASE
+    16, # KNEE_LEFT's parent is HIP_LEFT
+    17, # ANKLE_LEFT's parent is KNEE_LEFT
+    18, # FOOT_LEFT's parent is ANKLE_LEFT
+    0,  # HIP_RIGHT's parent is SPINE_BASE
+    20, # KNEE_RIGHT's parent is HIP_RIGHT
+    21, # ANKLE_RIGHT's parent is KNEE_RIGHT
+    22, # FOOT_RIGHT's parent is ANKLE_RIGHT
+    1   # SPINE_SHOULDER's parent is SPINE_MID
+]

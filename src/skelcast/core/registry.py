@@ -39,3 +39,6 @@ class Registry:
 
     def __str__(self):
         return str(self._module_dict)
+
+    def __contains__(self, module_name):
+        return module_name in self._module_dict

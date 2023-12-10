@@ -138,3 +138,8 @@ def build_object_from_config(config: Config, registry: Registry, **kwargs):
     _args = config.get('args')
     _args.update(kwargs)
     return registry[_name](**_args)
+
+def summarize_config(config: Config):
+    _name = config.get('name')
+    _args = config.get('args')
+    return f'{_name}({_args})'

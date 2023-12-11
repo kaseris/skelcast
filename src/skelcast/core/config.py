@@ -2,6 +2,7 @@ import abc
 import logging
 import yaml
 
+from collections import OrderedDict
 from typing import List
 
 from skelcast.core.registry import Registry
@@ -9,7 +10,7 @@ from skelcast.core.registry import Registry
 
 class Config:
     def __init__(self):
-        self._config = {}
+        self._config = OrderedDict()
         self._config['name'] = None
         self._config['args'] = {}
 
@@ -17,7 +18,12 @@ class Config:
         return self._config[key]
 
     def set(self, key, value):
-        self._config[key] = value
+        if isinstance(value, list):
+            self._config[key] = []
+            for v in value:
+                self._config[key].append(v)
+        else:
+            self._config[key] = value
 
     def __str__(self) -> str:
         s = self.__class__.__name__ + '(\n'
@@ -109,9 +115,14 @@ def read_config(config_path: str):
     cfgs = []
     for key in data:
         config = CONFIG_MAPPING[key]()
-        logging.debug(f'Loading {key} config. Building {config.__class__.__name__} object.')
-        config.set('name', data[key]['name'])
-        config.set('args', data[key]['args'])
+        if key == 'transforms':
+            for element in data[key]:                
+                logging.debug(f'Loading {key} config. Building {config.__class__.__name__} object.')
+                config.set(element['name'], element['args'])
+        else:
+            logging.debug(f'Loading {key} config. Building {config.__class__.__name__} object.')
+            config.set('name', data[key]['name'])
+            config.set('args', data[key]['args'])
         logging.debug(config)
         cfgs.append(config)
     return cfgs

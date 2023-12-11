@@ -115,8 +115,3 @@ def read_config(config_path: str):
         logging.debug(config)
         cfgs.append(config)
     return cfgs
-
-if __name__ == '__main__':
-    log_format = '[%(asctime)s] %(levelname)s %(message)s'
-    logging.basicConfig(level=logging.DEBUG, format=log_format)
-    cfgs = read_config('configs/pvred.yaml')

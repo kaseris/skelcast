@@ -1,9 +1,9 @@
-import abc
+import re
 import logging
 import yaml
 
 from collections import OrderedDict
-from typing import List
+from typing import Any, List
 
 from skelcast.core.registry import Registry
 
@@ -83,12 +83,27 @@ class RunnerConfig(Config):
     def __init__(self):
         super(RunnerConfig, self).__init__()
 
+class EnvironmentConfig:
+    def __init__(self, *args) -> None:
+        for arg in args:
+            name = arg.__class__.__name__
+            split_name = re.findall('[A-Z][^A-Z]*', name)
+            name = '_'.join([s.lower() for s in split_name])
+            setattr(self, name, arg)
+
+    def __str__(self) -> str:
+        s = self.__class__.__name__ + '(\n'
+        for key, val in self.__dict__.items():
+            s += f'\t{key}: {val}\n'
+        s += ')'
+        return s
+
 
 def build_object_from_config(config: Config, registry: Registry, **kwargs):
     _name = config.get('name')
     _args = config.get('args')
     _args.update(kwargs)
-    return registry[_name](**_args)
+    return registry.get_module(_name)(**_args)
 
 def summarize_config(configs: List[Config]):
     with open(f'/home/kaseris/Documents/mount/config.txt', 'w') as f:
@@ -125,4 +140,4 @@ def read_config(config_path: str):
             config.set('args', data[key]['args'])
         logging.debug(config)
         cfgs.append(config)
-    return cfgs
+    return EnvironmentConfig(*cfgs)

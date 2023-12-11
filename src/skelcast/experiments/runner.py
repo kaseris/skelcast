@@ -73,13 +73,14 @@ class Runner:
                  checkpoint_dir: str = None,
                  checkpoint_frequency: int = 1,
                  logger: BaseLogger = None,
-                 log_gradient_info: bool = False) -> None:
+                 log_gradient_info: bool = False,
+                 collate_fn = None) -> None:
         self.train_set = train_set
         self.val_set = val_set
         self.train_batch_size = train_batch_size
         self.val_batch_size = val_batch_size
         self.block_size = block_size
-        self._collate_fn = NTURGBDCollateFn(block_size=self.block_size, is_packed=True)
+        self._collate_fn = collate_fn if collate_fn is not None else NTURGBDCollateFn(block_size=self.block_size)
         self.train_loader = DataLoader(dataset=self.train_set, batch_size=self.train_batch_size, shuffle=True, collate_fn=self._collate_fn)
         self.val_loader = DataLoader(dataset=self.val_set, batch_size=self.val_batch_size, shuffle=False, collate_fn=self._collate_fn)
         self.model = model

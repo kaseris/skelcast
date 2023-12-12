@@ -115,6 +115,8 @@ class Environment:
                             checkpoint_dir=self.checkpoint_dir,
                             **cfgs.runner_config.get('args'))
         logging.info(f'Finished building environment from {config_path}.')
+        self._runner.setup()
+        logging.info(f'Set up runner.')
 
     
     def run(self) -> None:

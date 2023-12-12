@@ -147,7 +147,7 @@ class NTURGBDCollateFn:
             batch_x = torch.nn.utils.rnn.pack_padded_sequence(batch_x, seq_lens, batch_first=True, enforce_sorted=False)
             batch_y = torch.nn.utils.rnn.pack_padded_sequence(batch_y, seq_lens, batch_first=True, enforce_sorted=False)
         labels = default_collate(labels)
-        return NTURGBDSample(x=batch_x, y=batch_y, label=labels)
+        return NTURGBDSample(x=batch_x, y=batch_y, label=labels, mask=None)
     
     def get_windows(self, x):
         seq_len = x.shape[0]

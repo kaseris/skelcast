@@ -6,6 +6,7 @@ from collections import OrderedDict
 from typing import Any, List
 
 from skelcast.core.registry import Registry
+from skelcast.data.transforms import Compose
 
 
 class Config:
@@ -50,8 +51,23 @@ class DatasetConfig(Config):
 
 
 class TransformsConfig(Config):
-    def __init__(self):
-        super(TransformsConfig, self).__init__()
+    def __init__(self, transforms):
+        super().__init__()
+        self.set('args', self.parse_transforms(transforms))
+
+    def parse_transforms(self, transforms):
+        parsed_transforms = []
+        for transform in transforms:
+            # Assuming each transform in the list is a dictionary
+            transform_dict = {'name': transform.get('name'), 'args': transform.get('args', {})}
+            parsed_transforms.append(transform_dict)
+        return parsed_transforms
+
+    def get(self, key):
+        if key == 'args':
+            return self._config['args']
+        else:
+            return super().get(key)
 
 
 class LoggerConfig(Config):
@@ -100,10 +116,18 @@ class EnvironmentConfig:
 
 
 def build_object_from_config(config: Config, registry: Registry, **kwargs):
-    _name = config.get('name')
-    _args = config.get('args')
-    _args.update(kwargs)
-    return registry.get_module(_name)(**_args)
+    if isinstance(config, TransformsConfig):
+        list_of_transforms = []
+        for transform in config.get('args'):
+            logging.debug(transform)
+            tf = registry.get_module(transform.get('name'))(**transform.get('args'))
+            list_of_transforms.append(tf)
+        return Compose(list_of_transforms)
+    else:
+        _name = config.get('name')
+        _args = config.get('args')
+        _args.update(kwargs)
+        return registry.get_module(_name)(**_args)
 
 def summarize_config(configs: List[Config]):
     with open(f'/home/kaseris/Documents/mount/config.txt', 'w') as f:
@@ -129,15 +153,17 @@ def read_config(config_path: str):
         data = yaml.safe_load(f)
     cfgs = []
     for key in data:
-        config = CONFIG_MAPPING[key]()
         if key == 'transforms':
-            for element in data[key]:                
-                logging.debug(f'Loading {key} config. Building {config.__class__.__name__} object.')
-                config.set(element['name'], element['args'])
+            # Initialize TransformsConfig with the transforms data
+            config = CONFIG_MAPPING[key](data[key])
+            logging.debug(f'Loading {key} config. Building {config.__class__.__name__} object.')
         else:
+            # Initialize other configurations normally
+            config = CONFIG_MAPPING[key]()
             logging.debug(f'Loading {key} config. Building {config.__class__.__name__} object.')
             config.set('name', data[key]['name'])
             config.set('args', data[key]['args'])
+        
         logging.debug(config)
         cfgs.append(config)
     return EnvironmentConfig(*cfgs)

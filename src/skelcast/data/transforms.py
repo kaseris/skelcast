@@ -76,3 +76,13 @@ class CartToQuaternionTransform:
     def __call__(self, x) -> Any:
         _exps = xyz_to_expmap(x, self.pareents)
         return exps_to_quats(_exps)
+
+class Compose:
+    def __init__(self, transforms: list) -> None:
+        self.transforms = transforms
+
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        for t in self.transforms:
+            x = t(x)
+        return x
+    

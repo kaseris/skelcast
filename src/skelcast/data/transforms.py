@@ -69,12 +69,12 @@ class CartToQuaternionTransform:
 
     def __init__(self, parents: list = None) -> None:
         if parents is None:
-            self.pareents = KinectSkeleton.parent_scheme()
+            self.parents = KinectSkeleton.parent_scheme()
         else:
             self.parents = parents
 
     def __call__(self, x) -> Any:
-        _exps = xyz_to_expmap(x, self.pareents)
+        _exps = xyz_to_expmap(x, self.parents)
         return exps_to_quats(_exps)
 
 class Compose:

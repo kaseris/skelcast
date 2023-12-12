@@ -3,7 +3,7 @@ import logging
 import yaml
 
 from collections import OrderedDict
-from typing import Any, List
+from typing import Any, List, Union
 
 from skelcast.core.registry import Registry
 from skelcast.data.transforms import Compose
@@ -115,7 +115,7 @@ class EnvironmentConfig:
         return s
 
 
-def build_object_from_config(config: Config, registry: Registry, **kwargs):
+def build_object_from_config(config: Config, registry: Union[Registry, dict], **kwargs):
     if isinstance(config, TransformsConfig):
         list_of_transforms = []
         for transform in config.get('args'):
@@ -127,6 +127,8 @@ def build_object_from_config(config: Config, registry: Registry, **kwargs):
         _name = config.get('name')
         _args = config.get('args')
         _args.update(kwargs)
+        if isinstance(registry, dict):
+            return registry[_name](**_args)
         return registry.get_module(_name)(**_args)
 
 def summarize_config(configs: List[Config]):

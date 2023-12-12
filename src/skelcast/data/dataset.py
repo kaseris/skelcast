@@ -190,20 +190,21 @@ class NTURGBDCollateFnWithRandomSampledContextWindow:
         seq_lens = [sample.shape[0] for sample, _ in batch]
         labels = [label for _, label in batch]
         pre_batch = []
+        pre_mask = []
         for sample, _ in batch:
-            logging.debug(f'sample.shape: {sample.shape}')
             if sample.shape[0] <= self.block_size:
                 # Sample the entire sequence
-                logging.debug(f'Detected a sample with a sample length of {sample.shape[0]}')
                 pre_batch.append(sample)
+                pre_mask.append(torch.ones_like(sample))
             else:
                 # Sample a random index
                 idx = torch.randint(low=0, high=sample.shape[0] - self.block_size, size=(1,)).item()
                 pre_batch.append(sample[idx:idx + self.block_size, ...])
+                pre_mask.append(torch.ones_like(sample[idx:idx + self.block_size, ...]))
         # Pad the sequences to the maximum sequence length in the batch
         batch_x = torch.nn.utils.rnn.pad_sequence(pre_batch, batch_first=True)
         # Generate masks
-        masks = torch.nn.utils.rnn.pack_sequence([torch.ones(seq_len) for seq_len in seq_lens], enforce_sorted=False).to(torch.float32)
+        masks = torch.nn.utils.rnn.pad_sequence(pre_mask, batch_first=True)
         return NTURGBDSample(x=batch_x, y=batch_x, label=labels, mask=masks)
     
 

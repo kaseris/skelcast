@@ -31,7 +31,7 @@ collate_fn:
 logger:
   name: TensorboardLogger
   args:
-    save_dir: runs
+    log_dir: runs
 
 optimizer:
   name: AdamW
@@ -63,3 +63,4 @@ runner:
     block_size: 8
     log_gradient_info: true
     device: cuda
+    n_epochs: 100

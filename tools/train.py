@@ -7,6 +7,7 @@ args = ArgumentParser()
 args.add_argument('--config', type=str, default='../configs/lstm_regressor_1024x1024.yaml')
 args.add_argument('--data_dir', type=str, default='data')
 args.add_argument('--checkpoint_dir', type=str, default='checkpoints')
+args.add_argument('--train_set_size', type=float, default=0.8, required=False)
 
 args = args.parse_args()
 

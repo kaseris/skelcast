@@ -69,10 +69,12 @@ class Environment:
     def build_from_file(self, config_path: str) -> None:
         logging.log(logging.INFO, f'Building environment from {config_path}.')
         cfgs = read_config(config_path=config_path)
-        self._dataset = build_object_from_config(cfgs.dataset_config, DATASETS)
-        # TODO: Add support for random splits
         # TODO: Handle the case of transforms with a Compose object
         self._transforms = build_object_from_config(cfgs.transforms_config, TRANSFORMS)
+        # TODO: Add support for random splits
+        self._dataset = build_object_from_config(cfgs.dataset_config, DATASETS)
+        
+        
     
     def run(self) -> None:
         # Must check if there is a checkpoint directory

@@ -182,10 +182,11 @@ class Runner:
     def training_step(self, train_batch: NTURGBDSample):
         x, y, mask = train_batch.x, train_batch.y, train_batch.mask
         # Cast them to a torch float32 and move them to the gpu
-        x, y = x.to(torch.float32), y.to(torch.float32)
-        x, y = x.to(self.device), y.to(self.device)
+        # TODO: Handle the mask None case
+        x, y, mask = x.to(torch.float32), y.to(torch.float32), mask.to(torch.float32)
+        x, y, mask = x.to(self.device), y.to(self.device), mask.to(self.device)
         self.model.train()
-        out = self.model.training_step(x, y)
+        out = self.model.training_step(x, y, mask) # TODO: Make the other models accept a mask as well
         loss = out['loss']
         self.optimizer.zero_grad()
         loss.backward()
@@ -212,12 +213,12 @@ class Runner:
             self.logger.add_scalar(tag='train/step_loss', scalar_value=loss.item(), global_step=len(self.training_loss_per_step))
 
     def validation_step(self, val_batch: NTURGBDSample):
-        x, y = val_batch.x, val_batch.y, val_batch.mask
+        x, y, mask = val_batch.x, val_batch.y, val_batch.mask
         # Cast them to a torch float32 and move them to the gpu
-        x, y = x.to(torch.float32), y.to(torch.float32)
-        x, y = x.to(self.device), y.to(self.device)
+        x, y, mask = x.to(torch.float32), y.to(torch.float32), mask.to(torch.float32)
+        x, y, mask = x.to(self.device), y.to(self.device), mask.to(self.device)
         self.model.eval()
-        out = self.model.validation_step(x, y)
+        out = self.model.validation_step(x, y, mask)
         loss = out['loss']
         self.validation_loss_per_step.append(loss.item())
         # Log it to the logger

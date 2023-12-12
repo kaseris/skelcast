@@ -14,9 +14,9 @@ transforms:
   - name: MinMaxScaleTransform
     args:
       feature_scale: [0.0, 1.0]
-  - name: SomeOtherTransform
+  - name: CartToExpMapsTransform
     args:
-      some_arg: some_value
+      
 
 loss:
   name: MSELoss

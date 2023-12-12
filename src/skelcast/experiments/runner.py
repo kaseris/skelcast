@@ -180,7 +180,7 @@ class Runner:
         return self._compile_results()
 
     def training_step(self, train_batch: NTURGBDSample):
-        x, y = train_batch.x, train_batch.y
+        x, y, mask = train_batch.x, train_batch.y, train_batch.mask
         # Cast them to a torch float32 and move them to the gpu
         x, y = x.to(torch.float32), y.to(torch.float32)
         x, y = x.to(self.device), y.to(self.device)
@@ -212,7 +212,7 @@ class Runner:
             self.logger.add_scalar(tag='train/step_loss', scalar_value=loss.item(), global_step=len(self.training_loss_per_step))
 
     def validation_step(self, val_batch: NTURGBDSample):
-        x, y = val_batch.x, val_batch.y
+        x, y = val_batch.x, val_batch.y, val_batch.mask
         # Cast them to a torch float32 and move them to the gpu
         x, y = x.to(torch.float32), y.to(torch.float32)
         x, y = x.to(self.device), y.to(self.device)

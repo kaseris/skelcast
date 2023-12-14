@@ -1,4 +1,5 @@
 """Copied from https://github.com/qxcv/pose-prediction/blob/master/expmap.py"""
+import torch
 import numpy as np
 
 
@@ -85,7 +86,7 @@ def xyz_to_expmap(xyz_seq, parents):
     root = toposorted[0]
     exp_seq[1:, root] = xyz_seq[1:, root] - xyz_seq[:-1, root]
 
-    return exp_seq
+    return torch.from_numpy(exp_seq).unsqueeze(1)
 
 def exp_to_rotmat(exp):
     """Convert rotation paramterised as exponential map into ordinary 3x3
@@ -133,4 +134,4 @@ def exps_to_quats(exps):
     rv_flat[nonzero_mask, 1:] = nonzero_normed * sines[..., None]
 
     rv_shape = exps.shape[:-1] + (4, )
-    return rv_flat.reshape(rv_shape)
+    return torch.from_numpy(rv_flat.reshape(rv_shape)).unsqueeze(1)

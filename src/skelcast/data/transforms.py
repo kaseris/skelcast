@@ -1,3 +1,5 @@
+import logging
+
 import torch
 from typing import Any, Tuple
 
@@ -50,8 +52,11 @@ class CartToExpMapsTransform:
         else:
             self.parents = parents
 
-    def __call__(self, x) -> torch.Tensor:
-        return xyz_to_expmap(x, self.parents)
+    def __call__(self, x) -> torch.Tensor: # Really? Torch tensor? Check it again
+        logging.info(f'The type of x is: {type(x)}')
+        if isinstance(x, torch.Tensor):
+            return xyz_to_expmap(x.squeeze(1).numpy(), self.parents)
+        return xyz_to_expmap(x.squeeze(1), self.parents)
 
 
 @TRANSFORMS.register_module()
@@ -74,8 +79,11 @@ class CartToQuaternionTransform:
             self.parents = parents
 
     def __call__(self, x) -> Any:
+        if isinstance(x, torch.Tensor):
+            x = x.squeeze(1).numpy()
         _exps = xyz_to_expmap(x, self.parents)
-        return exps_to_quats(_exps)
+        # Because it returns a tensor we need to convert it to numpy
+        return exps_to_quats(_exps.squeeze(1).numpy())
 
 class Compose:
     def __init__(self, transforms: list) -> None:

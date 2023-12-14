@@ -14,9 +14,9 @@ transforms:
   - name: MinMaxScaleTransform
     args:
       feature_scale: [0.0, 1.0]
-  - name: CartToExpMapsTransform
-    args:
-      parents: null
+  # - name: CartToExpMapsTransform
+  #   args:
+  #     parents: null
 
 loss:
   name: MSELoss
@@ -48,7 +48,7 @@ model:
     enc_type: lstm
     dec_type: lstm
     include_velocity: false
-    pos_enc: add
+    pos_enc: null
     batch_first: true
     std_thresh: 0.0001
     use_std_mask: false

@@ -188,6 +188,10 @@ class Runner:
         self.model.train()
         out = self.model.training_step(x, y, mask) # TODO: Make the other models accept a mask as well
         loss = out['loss']
+        outputs = out['out']
+        # Calculate the saturation of the tanh output
+        saturated = (outputs.abs() > 0.95)
+        saturation_percentage = saturated.sum(dim=(1, 2)).float() / (outputs.size(1) * outputs.size(2)) * 100
         self.optimizer.zero_grad()
         loss.backward()
         if self.log_gradient_info:
@@ -204,6 +208,9 @@ class Runner:
             if self.logger is not None:
                 for name, ratio in self.model.gradient_update_ratios.items():
                     self.logger.add_scalar(tag=f'gradient/{name}_grad_update_norm_ratio', scalar_value=ratio, global_step=len(self.training_loss_per_step))
+
+            if self.logger is not None:
+                self.logger.add_scalar(tag='train/saturation', scalar_value=saturation_percentage.mean().item(), global_step=len(self.training_loss_per_step))
 
         self.optimizer.step()
         # Print the loss

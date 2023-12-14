@@ -78,7 +78,9 @@ def xyz_to_expmap(xyz_seq, parents):
         cross_vecs = np.cross(norm_parent_bones, norm_bones)
         norm_cross_vecs = _norm_bvecs(cross_vecs)
         # dot products give us rotation angle
-        angles = np.arccos(np.sum(norm_bones * norm_parent_bones, axis=-1))
+        cos_values = np.sum(norm_bones * norm_parent_bones, axis=-1)
+        clamped_cos_values = np.clip(cos_values, -1.0, 1.0)
+        angles = np.arccos(clamped_cos_values)
         log_map = norm_cross_vecs * angles[..., None]
         exp_seq[:, child] = log_map
 

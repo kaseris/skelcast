@@ -182,7 +182,8 @@ class PositionalVelocityRecurrentEncoderDecoder(SkelcastModule):
         
         batch_size, seq_len, n_bodies, n_joints, dims = x.shape
         x = x.view(batch_size, seq_len, n_bodies * n_joints * dims)
-        masks = masks.view(batch_size, seq_len, n_bodies * n_joints * dims)
+        if masks is not None:
+            masks = masks.view(batch_size, seq_len, n_bodies * n_joints * dims)
         # Calculate the velocity if the include_velocity flag is true
         if self.include_velocity:
             vel_inp = self._calculate_velocity(x)

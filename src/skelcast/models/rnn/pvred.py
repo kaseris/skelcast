@@ -14,7 +14,7 @@ class Encoder(nn.Module):
                  input_dim: int = 75,
                  hidden_dim: int = 256,
                  batch_first: bool = True,
-                 dropout: float = 0.2,
+                 dropout: float = 0.5,
                  use_residual: bool = True) -> None:
         super().__init__()
         assert rnn_type in ['lstm', 'gru'], f'rnn_type must be one of rnn, lstm, gru, got {rnn_type}'
@@ -28,6 +28,26 @@ class Encoder(nn.Module):
             self.rnn = nn.GRU(input_size=input_dim, hidden_size=hidden_dim, batch_first=batch_first)
         self.linear = nn.Linear(hidden_dim, input_dim)
         self.dropout = nn.Dropout(dropout)
+
+        if self.rnn_type == 'lstm':
+            for name, param in self.rnn.named_parameters():
+                if 'weight_ih' in name:
+                    torch.nn.init.xavier_uniform_(param.data)
+                elif 'weight_hh' in name:
+                    torch.nn.init.orthogonal_(param.data)
+                elif 'bias' in name:
+                    param.data.fill_(0)
+
+        elif self.rnn_type == 'gru':
+            for name, param in self.rnn.named_parameters():
+                if 'weight_ih' in name:
+                    torch.nn.init.kaiming_normal_(param.data)
+                elif 'weight_hh' in name:
+                    torch.nn.init.orthogonal_(param.data)
+                elif 'bias' in name:
+                    param.data.fill_(0)
+
+
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out, hidden = self.rnn(x)
@@ -44,7 +64,7 @@ class Decoder(nn.Module):
                  input_dim: int = 75,
                  hidden_dim: int = 256,
                  batch_first: bool = True,
-                 dropout: float = 0.2,
+                 dropout: float = 0.5,
                  use_residual: bool = True) -> None:
         super().__init__()
         assert rnn_type in ['lstm', 'gru'], f'rnn_type must be one of rnn, lstm, gru, got {rnn_type}'
@@ -57,7 +77,27 @@ class Decoder(nn.Module):
         elif self.rnn_type == 'gru':
             self.rnn = nn.GRU(input_size=input_dim, hidden_size=hidden_dim, batch_first=batch_first)
         self.linear = nn.Linear(hidden_dim, input_dim)
+        self.tanh = nn.Tanh()
         self.dropout = nn.Dropout(dropout)
+
+        if self.rnn_type == 'lstm':
+            for name, param in self.rnn.named_parameters():
+                if 'weight_ih' in name:
+                    torch.nn.init.xavier_uniform_(param.data)
+                elif 'weight_hh' in name:
+                    torch.nn.init.orthogonal_(param.data)
+                elif 'bias' in name:
+                    param.data.fill_(0)
+
+        elif self.rnn_type == 'gru':
+            for name, param in self.rnn.named_parameters():
+                if 'weight_ih' in name:
+                    torch.nn.init.kaiming_normal_(param.data)
+                elif 'weight_hh' in name:
+                    torch.nn.init.orthogonal_(param.data)
+                elif 'bias' in name:
+                    param.data.fill_(0)
+
     
     def forward(self, x: torch.Tensor, hidden: torch.Tensor = None, timesteps_to_predict: int = 5) -> torch.Tensor:
         predictions = []
@@ -65,8 +105,9 @@ class Decoder(nn.Module):
             out, hidden = self.rnn(x, hidden)
             out = self.dropout(out)
             out = self.linear(out)
+            out = self.tanh(out)
             if self.use_residual:
-                out = out + x
+                out = self.tanh(out + x)
             predictions.append(out)
             x = out
         return torch.cat(predictions, dim=1)

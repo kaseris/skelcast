@@ -51,7 +51,7 @@ class CatConv2D(nn.Module):
     
 @MODELS.register_module()
 class Unet(SkelcastModule):
-    def __init__(self, filters=64, seq_size=50, out_size=5):
+    def __init__(self, filters=64, seq_size=50, out_size=5, loss_fn: nn.Module = None):
         super().__init__()
         # Decoder
         self.c1 = Conv2D(seq_size, filters, 1)
@@ -69,7 +69,9 @@ class Unet(SkelcastModule):
         self.cc3 = CatConv2D(filters * 4, filters * 2, 1)
         self.u4 = UpConv2D(filters * 2, filters, 1, mode='bilinear')
         self.cc4 = CatConv2D(filters * 2, filters, 1)
-        self.outconv = Conv2D(filters, out_size, 1)    
+        self.outconv = Conv2D(filters, out_size, 1)  
+
+        self.loss_fn = loss_fn if loss_fn is not None else nn.MSELoss()  
 
     def forward(self, x):
         x1 = self.c1(x)
@@ -93,3 +95,18 @@ class Unet(SkelcastModule):
         x = self.cc4(x, x1)
         x = self.outconv(x)
         return x
+    
+    def training_step(self, x: torch.Tensor, y: torch.Tensor) -> dict:
+        out = self(x)
+        loss = self.loss_fn(out, y)
+        return {'out': out, 'loss': loss}
+    
+    @torch.no_grad()
+    def validation_step(self, x, y) -> dict:
+        out = self(x)
+        loss = self.loss_fn(out, y)
+        return {'out': out, 'loss': loss}
+    
+    @torch.no_grad()
+    def predict(self):
+        pass

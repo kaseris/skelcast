@@ -51,7 +51,24 @@ class CatConv2D(nn.Module):
     
 @MODELS.register_module()
 class Unet(SkelcastModule):
-    def __init__(self, filters=64, seq_size=50, out_size=5, loss_fn: nn.Module = None):
+    """
+    A really nice implementation of the U-Net architecture of the architecture implemented in the paper:
+    Accurate Monitoring of 24-h Real-World Movement Behavior in People with Cerebral Palsy Is Possible Using Multiple Wearable Sensors and Deep Learning.
+    https://www.mdpi.com/1424-8220/23/22/9045
+    
+    Credits to its creator: Georgios Zampoukis
+    Args:
+        filters (int): Number of filters to use in the convolutional layers.
+        seq_size (int): Number of frames in the input sequence.
+        out_size (int): Number of output channels.
+        loss_fn (nn.Module): Loss function to use.
+        observe_until (int): Number of frames to observe before predicting.
+        ts_to_predict (int): Number of frames to predict.
+        use_padded_len_mask (bool): Whether to use a mask to ignore padded values.
+    """
+    def __init__(self, filters=64, seq_size=50, out_size=5, loss_fn: nn.Module = None,
+                 observe_until: int = 20, ts_to_predict: int = 5,
+                 use_padded_len_mask: bool = False):
         super().__init__()
         # Decoder
         self.c1 = Conv2D(seq_size, filters, 1)
@@ -71,7 +88,10 @@ class Unet(SkelcastModule):
         self.cc4 = CatConv2D(filters * 2, filters, 1)
         self.outconv = Conv2D(filters, out_size, 1)  
 
-        self.loss_fn = loss_fn if loss_fn is not None else nn.MSELoss()  
+        self.loss_fn = loss_fn if loss_fn is not None else nn.SmoothL1Loss()
+        self.observe_until = observe_until
+        self.ts_to_predict = ts_to_predict
+        self.use_padded_len_mask = use_padded_len_mask
 
     def forward(self, x):
         x1 = self.c1(x)
@@ -90,8 +110,18 @@ class Unet(SkelcastModule):
         x = self.outconv(x)
         return x
     
-    def training_step(self, x: torch.Tensor, y: torch.Tensor) -> dict:
-        out = self(x)
+    def training_step(self, x: torch.Tensor, y: torch.Tensor = None, mask: torch.Tensor = None) -> dict:
+        batch_size, seq_len, n_skels, n_joints, dims = x.shape
+        x = x.view(batch_size, seq_len, n_joints, dims)
+        x_observe = x[:, :self.observe_until, :, :]
+        y = x[:, self.observe_until:self.observe_until + self.ts_to_predict, :, :]
+        # View the mask as the x tensor
+        if self.use_padded_len_mask:
+            mask = mask.view(batch_size, seq_len, n_joints, dims)
+            mask = mask[:, self.observe_until:self.observe_until + self.ts_to_predict, :]
+        out = self(x_observe)
+        if self.use_padded_len_mask:
+            out = out * mask
         loss = self.loss_fn(out, y)
         return {'out': out, 'loss': loss}
     

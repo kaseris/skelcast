@@ -192,6 +192,9 @@ class Runner:
         # Calculate the saturation of the tanh output
         saturated = (outputs.abs() > 0.95)
         saturation_percentage = saturated.sum(dim=(1, 2)).float() / (outputs.size(1) * outputs.size(2)) * 100
+        # Calculate the dead neurons
+        dead_neurons = (outputs.abs() < 0.05)
+        dead_neurons_percentage = dead_neurons.sum(dim=(1, 2)).float() / (outputs.size(1) * outputs.size(2)) * 100
         self.optimizer.zero_grad()
         loss.backward()
         if self.log_gradient_info:
@@ -211,6 +214,7 @@ class Runner:
 
             if self.logger is not None:
                 self.logger.add_scalar(tag='train/saturation', scalar_value=saturation_percentage.mean().item(), global_step=len(self.training_loss_per_step))
+                self.logger.add_scalar(tag='train/dead_neurons', scalar_value=dead_neurons_percentage.mean().item(), global_step=len(self.training_loss_per_step))
 
         self.optimizer.step()
         # Print the loss

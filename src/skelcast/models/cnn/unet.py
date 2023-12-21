@@ -75,17 +75,11 @@ class Unet(SkelcastModule):
 
     def forward(self, x):
         x1 = self.c1(x)
-        print(f'x1 shape: {x1.shape}')
         x2 = self.c2(x1)
-        print(f'x2 shape: {x2.shape}')
         x3 = self.c3(x2)
-        print(f'x3 shape: {x3.shape}')
         x4 = self.c4(x3)
-        print(f'x4 shape: {x4.shape}')
         x5 = self.c5(x4)
-        print(f'x5 shape: {x5.shape}')
         x = self.u1(x5)
-        print(f'u1 shape: {x.shape}')
         x = self.cc1(x, x4)
         x = self.u2(x)
         x = self.cc2(x, x3)

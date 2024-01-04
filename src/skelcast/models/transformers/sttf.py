@@ -2,6 +2,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from skelcast.models.module import SkelcastModule
+from skelcast.models.transformers.base import PositionalEncoding
+from skelcast.models import MODELS
+
+
 class TemporalMultiHeadAttentionBlock(nn.Module):
   '''
   Args:
@@ -32,13 +37,11 @@ class TemporalMultiHeadAttentionBlock(nn.Module):
     q_proj = self.q(x)
     k_proj = self.k(x)
     v_proj = self.v(x)
-    print(f'q_proj, k_proj, v_proj shapes: {q_proj.shape, k_proj.shape, v_proj.shape}')
     mask = self.get_mask(seq_len, batch_size)
     attn_prod_ = torch.bmm(q_proj, k_proj.permute(0, 2, 1)) * (self.d_model) ** -0.5
 
     attn_temporal = F.softmax(attn_prod_ + mask, dim=-1)
     attn = attn_temporal @ v_proj
-    print(f'attn shape: {attn.shape}')
     out = self.back_proj(attn.view(batch_size, seq_len, n_joints, -1))
     out = self.dropout(out)
     if self.debug:
@@ -141,3 +144,85 @@ class Transformer(nn.Module):
       o_2 = spa_attn(x)
       out = mlp(o_1 + o_2)
       return out
+    
+
+@MODELS.register_module()
+class SpatioTemporalTransformer(SkelcastModule):
+  """
+  PyTorch implementation of the model proposed in the paper:
+  "A Spatio-temporal Transformer for 3D Human Motion Prediction"
+  https://arxiv.org/abs/2004.08692
+
+  Args:
+  -  n_joints `int`: Number of joints in the skeleton
+  -  d_model `int`: The input dimensionality after the linear projection that computes the skeleton joints representation
+  -  n_blocks `int`: Number of transformer blocks
+  -  n_heads `int`: Number of self attention heads (for both temporal and spatial attention)
+  -  d_head `int`: The per-head dimensionality
+  -  mlp_dim `int`: The dimensionality of the MLP
+  -  dropout `float`: Dropout probability
+  """
+  def __init__(self, n_joints,
+               d_model,
+               n_blocks,
+               n_heads,
+               d_head,
+               mlp_dim,
+               dropout,
+               loss_fn: nn.Module = None,
+               debug=False):
+    super().__init__()
+    self.n_joints = n_joints
+    self.d_model = d_model
+    self.n_blocks = n_blocks
+    self.n_heads = n_heads
+    self.d_head = d_head
+    self.mlp_dim = mlp_dim
+    self.dropout = dropout
+    self.loss_fn = nn.SmoothL1Loss() if loss_fn is None else loss_fn
+    self.debug = debug
+
+    # Embedding projection before feeding into the transformer
+    self.embedding = nn.Linear(in_features=3 * n_joints, out_features=d_model * n_joints, bias=False)
+    self.pre_dropout = nn.Dropout(dropout)
+    self.pe = PositionalEncoding(d_model=d_model * n_joints)
+
+    self.transformer = Transformer(mlp_dim=mlp_dim,
+                                   dim=d_model,
+                                   n_blocks=n_blocks,
+                                   n_heads=n_heads,
+                                   d_head=d_head,
+                                   dropout=dropout,
+                                   n_joints=n_joints)
+    
+    self.linear_out = nn.Linear(in_features=d_model, out_features=3, bias=False)
+
+  def forward(self, x: torch.Tensor):
+    batch_size, seq_len, n_joints, dims = x.shape
+    input_ = x.view(batch_size, seq_len, n_joints * dims)
+    o = self.embedding(input_)
+    print(f'o shape after embedding: {o.shape}')
+    o = self.pe.pe.repeat(batch_size, 1, 1)[:, :seq_len, :] + o
+    print(f'o shape after positional encoding: {o.shape}')
+    o = self.pre_dropout(o)
+    o = o.view(batch_size, seq_len, n_joints, self.d_model)
+    o = self.transformer(o)
+    print(f'o shape after transformer: {o.shape}')
+    out = self.linear_out(o) + x
+    return out
+  
+  def training_step(self, **kwargs) -> dict:
+    # Retrieve the x and y from the keyword arguments
+    x, y = kwargs['x'], kwargs['y']
+    # Forward pass
+    out = self(x)
+    # Compute the loss
+    loss = self.loss_fn(out, y)
+    return {'loss': loss, 'out': out}
+
+  def validation_step(self, *args, **kwargs):
+    with torch.no_grad():
+      return self.training_step(*args, **kwargs)
+    
+  def predict(self, *args, **kwargs):
+    pass

@@ -79,7 +79,7 @@ class SpatialMultiHeadAttentionBlock(nn.Module):
 
     attn_prod_ = torch.bmm(q_proj_spatial, k_proj_spatial.permute(0, 2, 1)) * (self.d_model) ** -.5
 
-    attn_spatial = F.softmax(torch.bmm(q_proj_spatial, k_proj_spatial.permute(0, 2, 1)), dim=-1)
+    attn_spatial = F.softmax(attn_prod_, dim=-1)
 
     mha_attn_spatial = attn_spatial @ v_proj_spatial
     spatial_attn_out = self.back_proj_spatial(mha_attn_spatial.view(batch_size, n_joints, seq_len, self.n_heads * self.d_head).permute(0, 2, 1, 3))

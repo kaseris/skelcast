@@ -37,7 +37,7 @@ class TemporalMultiHeadAttentionBlock(nn.Module):
     q_proj = self.q(x)
     k_proj = self.k(x)
     v_proj = self.v(x)
-    mask = self.get_mask(seq_len, batch_size)
+    mask = self.get_mask(seq_len, batch_size).to(x.device)
     attn_prod_ = torch.bmm(q_proj, k_proj.permute(0, 2, 1)) * (self.d_model) ** -0.5
 
     attn_temporal = F.softmax(attn_prod_ + mask, dim=-1)
@@ -198,16 +198,15 @@ class SpatioTemporalTransformer(SkelcastModule):
     self.linear_out = nn.Linear(in_features=d_model, out_features=3, bias=False)
 
   def forward(self, x: torch.Tensor):
+    if x.ndim > 4:
+      x = x.squeeze(2)
     batch_size, seq_len, n_joints, dims = x.shape
     input_ = x.view(batch_size, seq_len, n_joints * dims)
     o = self.embedding(input_)
-    print(f'o shape after embedding: {o.shape}')
     o = self.pe.pe.repeat(batch_size, 1, 1)[:, :seq_len, :] + o
-    print(f'o shape after positional encoding: {o.shape}')
     o = self.pre_dropout(o)
     o = o.view(batch_size, seq_len, n_joints, self.d_model)
     o = self.transformer(o)
-    print(f'o shape after transformer: {o.shape}')
     out = self.linear_out(o) + x
     return out
   
@@ -217,7 +216,7 @@ class SpatioTemporalTransformer(SkelcastModule):
     # Forward pass
     out = self(x)
     # Compute the loss
-    loss = self.loss_fn(out, y)
+    loss = self.loss_fn(out, y.squeeze(2))
     return {'loss': loss, 'out': out}
 
   def validation_step(self, *args, **kwargs):

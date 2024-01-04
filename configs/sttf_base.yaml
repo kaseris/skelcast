@@ -14,9 +14,6 @@ transforms:
   - name: MinMaxScaleTransform
     args:
       feature_scale: [0.0, 1.0]
-  - name: CartToQuaternionTransform
-    args:
-      parents: null
 
 loss:
   name: SmoothL1Loss
@@ -45,7 +42,7 @@ model:
   args:
     n_joints: 25
     d_model: 256
-    n_blocks: 8
+    n_blocks: 3
     n_heads: 8
     d_head: 16
     mlp_dim: 512
@@ -54,8 +51,8 @@ model:
 runner:
   name: Runner
   args:
-    train_batch_size: 1024
-    val_batch_size: 1024
+    train_batch_size: 32
+    val_batch_size: 32
     block_size: 8
     log_gradient_info: true
     device: cuda

@@ -7,6 +7,7 @@ DECODERS = Registry()
 
 from .rnn.lstm import SimpleLSTMRegressor
 from .transformers.transformer import ForecastTransformer
+from .transformers.sttf import SpatioTemporalTransformer
 from .rnn.pvred import PositionalVelocityRecurrentEncoderDecoder
 from .rnn.pvred import Encoder, Decoder
 from .cnn.unet import Unet

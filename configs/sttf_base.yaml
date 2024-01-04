@@ -1,0 +1,62 @@
+dataset: 
+  name: NTURGBDDataset
+  args:
+    data_directory: /home/kaseris/Documents/mount/data_ntu_rgbd
+    label_file: /home/kaseris/Documents/dev/skelcast/data/labels.txt
+    missing_files_dir: /home/kaseris/Documents/dev/skelcast/data/missing
+    max_context_window: 10
+    max_number_of_bodies: 1
+    max_duration: 300
+    n_joints: 25
+    cache_file: /home/kaseris/Documents/mount/dataset_cache.pkl
+
+transforms:
+  - name: MinMaxScaleTransform
+    args:
+      feature_scale: [0.0, 1.0]
+  - name: CartToQuaternionTransform
+    args:
+      parents: null
+
+loss:
+  name: SmoothL1Loss
+  args:
+    reduction: mean
+    beta: 0.01
+
+collate_fn:
+  name: NTURGBDCollateFnWithRandomSampledContextWindow
+  args:
+    block_size: 10
+
+logger:
+  name: TensorboardLogger
+  args:
+    log_dir: runs
+
+optimizer:
+  name: AdamW
+  args:
+    lr: 0.0001
+    weight_decay: 0.0001
+
+model:
+  name: SpatioTemporalTransformer
+  args:
+    n_joints: 25
+    d_model: 256
+    n_blocks: 8
+    n_heads: 8
+    d_head: 16
+    mlp_dim: 512
+    dropout: 0.5
+
+runner:
+  name: Runner
+  args:
+    train_batch_size: 1024
+    val_batch_size: 1024
+    block_size: 8
+    log_gradient_info: true
+    device: cuda
+    n_epochs: 100

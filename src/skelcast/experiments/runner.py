@@ -186,7 +186,7 @@ class Runner:
         x, y, mask = x.to(torch.float32), y.to(torch.float32), mask.to(torch.float32)
         x, y, mask = x.to(self.device), y.to(self.device), mask.to(self.device)
         self.model.train()
-        out = self.model.training_step(x, y, mask) # TODO: Make the other models accept a mask as well
+        out = self.model.training_step(x=x, y=y, mask=mask) # TODO: Make the other models accept a mask as well
         loss = out['loss']
         outputs = out['out']
         # Calculate the saturation of the tanh output
@@ -229,7 +229,7 @@ class Runner:
         x, y, mask = x.to(torch.float32), y.to(torch.float32), mask.to(torch.float32)
         x, y, mask = x.to(self.device), y.to(self.device), mask.to(self.device)
         self.model.eval()
-        out = self.model.validation_step(x, y, mask)
+        out = self.model.validation_step(x=x, y=y, mask=mask)
         loss = out['loss']
         self.validation_loss_per_step.append(loss.item())
         # Log it to the logger

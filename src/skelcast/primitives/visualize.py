@@ -1,7 +1,7 @@
 import time
 
 from enum import Enum
-from typing import Union
+from typing import Union, Optional
 
 import numpy as np
 import torch
@@ -26,6 +26,7 @@ class Colors(Enum):
 
 
 def visualize_skeleton(skeleton: Union[np.ndarray, torch.Tensor],
+                       trajectory: Optional[Union[np.ndarray, torch.Tensor]] = None,
                        framerate: int = 30,
                        skeleton_type: str = 'kinect'):
     assert isinstance(skeleton, (np.ndarray, torch.Tensor)), f'Expected a numpy array or a PyTorch tensor, got {type(skeleton)} instead.'
@@ -48,6 +49,21 @@ def visualize_skeleton(skeleton: Union[np.ndarray, torch.Tensor],
     vis = o3d.visualization.Visualizer()
     vis.create_window()
     
+    if trajectory is not None:
+        trajectory_line_set = o3d.geometry.LineSet()
+    print(f'trajectory shape: {trajectory.shape}')
+    for timestep in range(trajectory.shape[0] - 1):
+        if trajectory is not None:
+                for joint in range(n_joints):
+                    # Create line segment for each joint connecting its position at this timestep to the next
+                    start_point = trajectory[timestep, joint]
+                    end_point = trajectory[timestep + 1, joint]
+                    trajectory_line_set.points.append(start_point)
+                    trajectory_line_set.points.append(end_point)
+                    index = len(trajectory_line_set.points) - 2
+                    trajectory_line_set.lines.append([index, index + 1])
+                    trajectory_line_set.colors.append([0, 1, 0])  # Set color for trajectory lines, e.g., green
+
     for timestep in range(seq_len):
         # Update point cloud for the current timestep
         point_cloud.points = o3d.utility.Vector3dVector(skeleton[timestep])
@@ -57,6 +73,9 @@ def visualize_skeleton(skeleton: Union[np.ndarray, torch.Tensor],
         line_set.lines = o3d.utility.Vector2iVector(bone_lines)
         line_set.points = o3d.utility.Vector3dVector(skeleton[timestep])
         line_set.colors = o3d.utility.Vector3dVector([Colors.BLUE.value for _ in connections])  # Blue color for connections
+
+        if trajectory is not None:
+            vis.add_geometry(trajectory_line_set)
 
         if timestep == 0:
             vis.add_geometry(point_cloud)

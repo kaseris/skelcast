@@ -28,6 +28,12 @@ class SkelcastModule(nn.Module, metaclass=abc.ABCMeta):
         Implements a validation step of a module
         """
         pass
+    
+    def from_pretrained(model_path=None):
+        """
+        Implements a method to load a pretrained model
+        """
+        pass
 
     def gradient_flow(self):
         """

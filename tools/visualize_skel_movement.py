@@ -27,9 +27,10 @@ if __name__ == '__main__':
                             max_number_of_bodies=1, transforms=tf)
     model = SpatioTemporalTransformer(n_joints=25, d_model=256, n_blocks=3, n_heads=8, d_head=16, mlp_dim=512, loss_fn=nn.SmoothL1Loss(), dropout=0.5)
     # TODO: Remove the hard coding of the checkpoint path
-    checkpoint = torch.load('/home/kaseris/Documents/mount/checkpoints_forecasting/presto-class/checkpoint_epoch_16_2024-01-05_092620.pt')
-    model_state_dict = checkpoint['model_state_dict']
-    model.load_state_dict(model_state_dict)
+    # checkpoint = torch.load('/home/kaseris/Documents/mount/checkpoints_forecasting/presto-class/checkpoint_epoch_16_2024-01-05_092620.pt')
+    # model_state_dict = checkpoint['model_state_dict']
+    # model.load_state_dict(model_state_dict)
+    model.from_pretrained('/home/kaseris/Documents/mount/checkpoints_forecasting/presto-class/checkpoint_epoch_16_2024-01-05_092620.pt')
     model = model.to('cpu')
     skeleton, label = dataset[args.sample]
     seq_len, n_bodies, n_joints, n_dims = skeleton.shape

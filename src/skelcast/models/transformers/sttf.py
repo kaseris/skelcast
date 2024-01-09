@@ -258,3 +258,11 @@ class SpatioTemporalTransformer(SkelcastModule):
             sample_input = sample[:, from_:to_, ...]
 
     return torch.stack(forecasted, dim=1)
+  
+  def from_pretrained(self, model_path=None):
+    if model_path is None:
+      raise ValueError('`model_path` must be provided.')
+    checkpoint = torch.load(model_path)
+    model_state_dict = checkpoint['model_state_dict']
+    self.load_state_dict(model_state_dict)
+    return self

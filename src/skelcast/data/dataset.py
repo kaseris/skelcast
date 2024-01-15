@@ -309,6 +309,7 @@ class Human36mDataset(Dataset):
         self.train = train
 
         self.train_inputs, self.test_inputs = [], []
+        self.act = []
 
         if self.use_hourglass_detections:
             train_2d_file = 'train_2d_ft.pth.tar'
@@ -327,6 +328,7 @@ class Human36mDataset(Dataset):
                 k3d = (sub, act, fname[:-3]) if fname.endswith('-sh') else k3d
                 assert self.train_3d[k3d].shape[0] == self.train_2d[k2d].shape[0], f'(training) 3d and 2d shapes not matching'
                 self.train_inputs.append(self.train_3d[k3d])
+                self.act.append(act)
 
         else:
             self.test_3d = torch.load(os.path.join(data_path, 'test_3d.pth.tar'))
@@ -337,6 +339,7 @@ class Human36mDataset(Dataset):
                 k3d = (sub, act, fname[:-3]) if fname.endswith('-sh') else k3d
                 assert self.test_2d[k2d].shape[0] == self.test_3d[k3d].shape[0], '(test) 3d and 2d shapes not matching'
                 self.test_inputs.append(self.test_3d[k3d])
+                self.act.append(act)
     
     def __getitem__(self, index) -> Any:
         if self.train:
@@ -345,7 +348,7 @@ class Human36mDataset(Dataset):
             x = torch.from_numpy(self.train_inputs[index]).float()
         else:
             x = torch.from_numpy(self.test_inputs[index]).float()
-        return x.view(-1, 16, 3)
+        return x.view(-1, 16, 3), self.act[index]
 
     def __len__(self):
         if self.train:

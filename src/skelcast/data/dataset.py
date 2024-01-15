@@ -310,7 +310,6 @@ class Human36mDataset(Dataset):
         self.train = train
 
         self.train_inputs, self.test_inputs = [], []
-        # self.train_meta, self.test_meta = [], []
 
         if self.use_hourglass_detections:
             train_2d_file = 'train_2d_ft.pth.tar'
@@ -327,11 +326,7 @@ class Human36mDataset(Dataset):
                 (sub, act, fname) = k2d
                 k3d = k2d
                 k3d = (sub, act, fname[:-3]) if fname.endswith('-sh') else k3d
-                # num_f, _ = self.train_2d[k2d].shape
                 assert self.train_3d[k3d].shape[0] == self.train_2d[k2d].shape[0], f'(training) 3d and 2d shapes not matching'
-                # for i in range(num_f):
-                #     self.train_inputs.append(self.train_2d[k2d][i])
-                #     self.train_out.append(self.train_3d[k3d][i])
                 self.train_inputs.append(self.train_3d[k3d])
 
         else:
@@ -339,27 +334,18 @@ class Human36mDataset(Dataset):
             self.test_2d = torch.load(os.path.join(data_path, test_2d_file))
             for k2d in self.test_2d.keys():
                 (sub, act, fname) = k2d
-                # if act not in self.actions:
-                #     continue
                 k3d = k2d
                 k3d = (sub, act, fname[:-3]) if fname.endswith('-sh') else k3d
-                # num_f, _ = self.test_2d[k2d].shape
                 assert self.test_2d[k2d].shape[0] == self.test_3d[k3d].shape[0], '(test) 3d and 2d shapes not matching'
                 self.test_inputs.append(self.test_3d[k3d])
-                # for i in range(num_f):
-                #     self.test_inputs.append(self.test_2d[k2d][i])
-                #     self.test_out.append(self.test_3d[k3d][i])
     
     def __getitem__(self, index) -> Any:
         if self.train:
             # We want the sampeles to be returned as sequences
             # i.e.: [seq_len, n_joints, 3]
             x = torch.from_numpy(self.train_inputs[index]).float()
-
         else:
             x = torch.from_numpy(self.test_inputs[index]).float()
-            # y = torch.from_numpy(self.test_out[index]).float()
-
         return x.view(-1, 16, 3)
 
     def __len__(self):

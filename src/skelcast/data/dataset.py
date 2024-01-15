@@ -303,8 +303,7 @@ class NTURGBDDataset(Dataset):
 
 @DATASETS.register_module()
 class Human36mDataset(Dataset):
-    def __init__(self, actions, data_path, use_hourglass_detections=True, train=True) -> None:
-        self.actions = actions
+    def __init__(self, data_path, use_hourglass_detections=True, train=True) -> None:
         self.data_path = data_path
         self.use_hourglass_detections = use_hourglass_detections
         self.train = train

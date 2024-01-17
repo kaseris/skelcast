@@ -4,9 +4,12 @@ scikit-learn
 pytest
 pytest-cov
 matplotlib
+opencv-python
+pyrender
 randomname
 pyyaml
 tensorboard
+trimesh
 discord
 git+https://github.com/nghorbani/configer
 git+https://github.com/nghorbani/human_body_prior

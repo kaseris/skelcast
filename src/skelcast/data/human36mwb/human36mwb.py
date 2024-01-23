@@ -2,6 +2,7 @@ import copy
 
 import numpy as np
 
+from skelcast.data import DATASETS
 from skelcast.data.human36mwb.camera import normalize_screen_coordinates
 from skelcast.data.human36mwb.human36mwbparams import h36m_cameras_intrinsic_params, h36m_cameras_extrinsic_params
 from skelcast.data.human36mwb.skeleton import Skeleton
@@ -43,7 +44,8 @@ class MocapDataset:
         return False
 
 
-class Human3WBDataset(MocapDataset):
+@DATASETS.register_module()
+class Human36MWBDataset(MocapDataset):
     def __init__(self, path, seq_len=27):
 
         self.seq_len = seq_len

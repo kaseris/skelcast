@@ -50,6 +50,16 @@ def qrot(q, v):
     uuv = torch.cross(qvec, uv, dim=1)
     return (v + 2 * (q[:, :1] * uv + uuv)).view(original_shape)
 
+def qinverse(q, inplace=False):
+    # We assume the quaternion to be normalized
+    if inplace:
+        q[..., 1:] *= -1
+        return q
+    else:
+        w = q[..., :1]
+        xyz = q[..., 1:]
+        return torch.cat((w, -xyz), dim=len(q.shape)-1)
+
 def qeuler(q, order, epsilon=0):
     """
     Convert quaternion(s) q to Euler angles.

@@ -142,6 +142,9 @@ class MocapDataset:
 
 @DATASETS.register_module()
 class Human36MDataset(MocapDataset):
+    """
+    TODO: Possibly add a flatten_data method for easy accessing with a single index.
+    """
     def __init__(self, path, seq_len=27):
         skeleton = Skeleton(offsets=[
        [   0.      ,    0.      ,    0.      ],

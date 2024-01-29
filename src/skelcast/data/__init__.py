@@ -6,4 +6,4 @@ TRANSFORMS = Registry()
 
 from .dataset import NTURGBDCollateFn, NTURGBDDataset
 from .transforms import MinMaxScaleTransform
-from .human36mwb import Human36MWBDataset
+from .human36m import Human36MDataset

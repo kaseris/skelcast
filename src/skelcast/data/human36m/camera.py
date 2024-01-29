@@ -8,7 +8,7 @@
 import numpy as np
 import torch
 
-from skelcast.data.human36mwb.quaternion import qrot, qinverse
+from skelcast.data.human36m.quaternion import qrot, qinverse
 
 def wrap(func, *args, unsqueeze=False):
     """

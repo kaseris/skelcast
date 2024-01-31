@@ -3,8 +3,10 @@ import torch
 import torch.nn as nn
 
 from skelcast.data.human36m.quaternion import qeuler
+from skelcast.losses import LOSSES
 
 
+@LOSSES.register_module()
 class EulerAngleLoss(nn.Module):
     def __init__(self, order="xyz", reduction="mean"):
         super(EulerAngleLoss, self).__init__()

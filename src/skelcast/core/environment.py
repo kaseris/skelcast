@@ -21,11 +21,12 @@ from skelcast.core.config import read_config, build_object_from_config
 
 torch.manual_seed(133742069)
 
+
 class Environment:
     """
     The Environment class is designed to set up and manage the environment for training machine learning models.
     It includes methods for building models, datasets, loggers, and runners based on specified configurations.
-    
+
     Attributes:
         _experiment_name (str): A randomly generated name for the experiment.
         checkpoint_dir (str): Directory path for storing model checkpoints.
@@ -52,13 +53,17 @@ class Environment:
         This class is highly dependent on external modules and configurations. Ensure that all required modules
         and configurations are properly set up before using this class.
     """
-    def __init__(self, data_dir: str = '/home/kaseris/Documents/data_ntu_rbgd',
-                 checkpoint_dir = '/home/kaseris/Documents/mount/checkpoints_forecasting',
-                 train_set_size = 0.8) -> None:
+
+    def __init__(
+        self,
+        data_dir: str = "/home/kaseris/Documents/data_ntu_rbgd",
+        checkpoint_dir="/home/kaseris/Documents/mount/checkpoints_forecasting",
+        train_set_size=0.8,
+    ) -> None:
         self._experiment_name = randomname.get_name()
         self.checkpoint_dir = os.path.join(checkpoint_dir, self._experiment_name)
         os.mkdir(self.checkpoint_dir)
-        logging.info(f'Created checkpoint directory at {self.checkpoint_dir}')
+        logging.info(f"Created checkpoint directory at {self.checkpoint_dir}")
         self.data_dir = data_dir
         self.train_set_size = train_set_size
         self.config = None
@@ -72,53 +77,80 @@ class Environment:
         self._optimizer = None
         self._collate_fn = None
 
-
     @property
     def experiment_name(self) -> str:
         return self._experiment_name
 
     def build_from_file(self, config_path: str) -> None:
-        logging.log(logging.INFO, f'Building environment from {config_path}.')
+        logging.log(logging.INFO, f"Building environment from {config_path}.")
         cfgs = read_config(config_path=config_path)
         # Build tranforms first, because they are used in the dataset
-        self._transforms = build_object_from_config(cfgs.transforms_config, TRANSFORMS)
+        if hasattr(cfgs, "transforms_config"):
+            self._transforms = build_object_from_config(
+                cfgs.transforms_config, TRANSFORMS
+            )
+        else:
+            self._transforms = None
         # TODO: Add support for random splits. Maybe as external parameter?
-        self._dataset = build_object_from_config(cfgs.dataset_config, DATASETS, transforms=self._transforms)
-        logging.info(f'Loaded dataset from {self.data_dir}.')
+        self._dataset = build_object_from_config(
+            cfgs.dataset_config, DATASETS, transforms=self._transforms
+        )
+        logging.info(f"Loaded dataset from {self.data_dir}.")
         # Build the loss first, because it is used in the model
-        loss_registry = LOSSES if cfgs.criterion_config.get('name') not in PYTORCH_LOSSES else PYTORCH_LOSSES
+        loss_registry = (
+            LOSSES
+            if cfgs.criterion_config.get("name") not in PYTORCH_LOSSES
+            else PYTORCH_LOSSES
+        )
         self._loss = build_object_from_config(cfgs.criterion_config, loss_registry)
         logging.info(f'Loaded loss function {cfgs.criterion_config.get("name")}.')
-        self._model = build_object_from_config(cfgs.model_config, MODELS, loss_fn=self._loss)
+        self._model = build_object_from_config(
+            cfgs.model_config, MODELS, loss_fn=self._loss
+        )
         logging.info(f'Loaded model {cfgs.model_config.get("name")}.')
         # Build the optimizer
-        self._optimizer = build_object_from_config(cfgs.optimizer_config, PYTORCH_OPTIMIZERS, params=self._model.parameters())
+        self._optimizer = build_object_from_config(
+            cfgs.optimizer_config, PYTORCH_OPTIMIZERS, params=self._model.parameters()
+        )
         logging.info(f'Loaded optimizer {cfgs.optimizer_config.get("name")}.')
         # Build the logger
-        cfgs.logger_config.get('args').update({'log_dir': os.path.join(cfgs.logger_config.get('args').get('log_dir'), self._experiment_name)})
+        cfgs.logger_config.get("args").update(
+            {
+                "log_dir": os.path.join(
+                    cfgs.logger_config.get("args").get("log_dir"), self._experiment_name
+                )
+            }
+        )
         self._logger = build_object_from_config(cfgs.logger_config, LOGGERS)
-        logging.info(f'Created runs directory at {cfgs.logger_config.get("args").get("log_dir")}')
+        logging.info(
+            f'Created runs directory at {cfgs.logger_config.get("args").get("log_dir")}'
+        )
         # Build the collate_fn
-        self._collate_fn = build_object_from_config(cfgs.collate_fn_config, COLLATE_FUNCS)
+        self._collate_fn = build_object_from_config(
+            cfgs.collate_fn_config, COLLATE_FUNCS
+        )
         logging.info(f'Loaded collate function {cfgs.collate_fn_config.get("name")}.')
         # Split the dataset into training and validation sets
         train_size = int(self.train_set_size * len(self._dataset))
         val_size = len(self._dataset) - train_size
-        self._train_dataset, self._val_dataset = random_split(self._dataset, [train_size, val_size])
+        self._train_dataset, self._val_dataset = random_split(
+            self._dataset, [train_size, val_size]
+        )
         # Build the runner
-        self._runner = Runner(model=self._model,
-                            optimizer=self._optimizer,
-                            logger=self._logger,
-                            collate_fn=self._collate_fn,
-                            train_set=self._train_dataset,
-                            val_set=self._val_dataset,
-                            checkpoint_dir=self.checkpoint_dir,
-                            **cfgs.runner_config.get('args'))
-        logging.info(f'Finished building environment from {config_path}.')
+        self._runner = Runner(
+            model=self._model,
+            optimizer=self._optimizer,
+            logger=self._logger,
+            collate_fn=self._collate_fn,
+            train_set=self._train_dataset,
+            val_set=self._val_dataset,
+            checkpoint_dir=self.checkpoint_dir,
+            **cfgs.runner_config.get("args"),
+        )
+        logging.info(f"Finished building environment from {config_path}.")
         self._runner.setup()
-        logging.info(f'Set up runner.')
+        logging.info(f"Set up runner.")
 
-    
     def run(self) -> None:
         # Must check if there is a checkpoint directory
         # If there is, load the latest checkpoint and continue training

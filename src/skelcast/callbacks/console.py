@@ -2,6 +2,8 @@ import sys
 import time
 from datetime import datetime
 
+import torch.distributed as dist
+
 from skelcast.callbacks.callback import Callback
 
 
@@ -15,6 +17,10 @@ class ConsoleCallback(Callback):
         self.validation_batches = 0
         self.training_batches = 0
         self.total_batches = 0
+        if dist.is_initialized():
+            self.rank = dist.get_rank()
+        else:
+            self.rank = None
 
     def on_epoch_start(self, epoch):
         self.current_epoch = epoch
@@ -51,7 +57,8 @@ class ConsoleCallback(Callback):
         now = datetime.now()
         now_formatted = now.strftime("[%Y-%m-%d %H:%M:%S]")
         clear_line = '\r' + ' ' * 80  # Create a line of 80 spaces
-        message = f"{now_formatted} Epoch: {self.current_epoch + 1}/{self.final_epoch}, Batch: {self.current_batch}/{self.total_batches}, Train Loss: {self.latest_train_loss}, Val Loss: {self.latest_val_loss}"
+        rank_info = f"Rank: {self.rank}, " if self.rank is not None else ""
+        message = f"{now_formatted} {rank_info} Epoch: {self.current_epoch + 1}/{self.final_epoch}, Batch: {self.current_batch}/{self.total_batches}, Train Loss: {self.latest_train_loss}, Val Loss: {self.latest_val_loss}"
         
         # First, print the clear_line to overwrite the previous output, then print your message
         print(f'{clear_line}\r{message}', end='')

@@ -1,9 +1,11 @@
 import copy
 
+from dataclasses import dataclass
+
 import numpy as np
 import torch
 
-from skelcast.data import DATASETS
+from skelcast.data import DATASETS, COLLATE_FUNCS
 from skelcast.data.human36m.camera import normalize_screen_coordinates
 from skelcast.data.human36m.skeleton import Skeleton
 
@@ -153,13 +155,64 @@ class MocapDataset:
         return self._skeleton
 
 
+@dataclass
+class Human36MSample:
+    x: torch.tensor
+    y: torch.tensor
+    mask: torch.tensor = None
+
+
+@COLLATE_FUNCS.register_module()
+class Human36MCollateFnWithRandomSampledContextWindow:
+    """
+    Custom collate function for batched variable-length sequences.
+    During the __call__ function, we creata `block_size`-long context windows, for each sequence in the batch.
+    If is_packed is True, we pack the padded sequences, otherwise we return the padded sequences as is.
+
+    Args:
+    - block_size (int): Sequence's context length.
+    - is_packed (bool): Whether to pack the padded sequence or not.
+
+    Returns:
+
+    The batched padded sequences ready to be fed to a transformer or an lstm model.
+    """
+
+    def __init__(self, block_size: int) -> None:
+        self.block_size = block_size
+
+    def __call__(self, batch) -> Human36MSample:
+        # Pick a random index for each element of the batch and create a context window of size `block_size`
+        # around that index
+        # If the batch element's sequence length is less than `block_size`, then we sample the entire sequence
+        # Pick the random index using pytorch
+        seq_lens = [sample.shape[0] for sample in batch]
+        pre_batch = []
+        pre_mask = []
+        for sample in batch:
+            if sample.shape[0] <= self.block_size:
+                # Sample the entire sequence
+                pre_batch.append(sample)
+                pre_mask.append(torch.ones_like(sample))
+            else:
+                # Sample a random index
+                idx = torch.randint(
+                    low=0, high=sample.shape[0] - self.block_size, size=(1,)
+                ).item()
+                pre_batch.append(torch.from_numpy(sample[idx : idx + self.block_size, ...]))
+        # Pad the sequences to the maximum sequence length in the batch
+        batch_x = torch.nn.utils.rnn.pad_sequence(pre_batch, batch_first=True)
+        # Generate masks
+        return Human36MSample(x=batch_x, y=batch_x, mask=None)
+
+
 @DATASETS.register_module()
 class Human36MDataset(MocapDataset):
     """
     TODO: Possibly add a flatten_data method for easy accessing with a single index.
     """
 
-    def __init__(self, path, seq_len=27):
+    def __init__(self, path, seq_len=27, **kwargs):
         skeleton = Skeleton(
             offsets=[
                 [0.0, 0.0, 0.0],
@@ -235,9 +288,9 @@ class Human36MDataset(MocapDataset):
         super().__init__(path, skeleton, fps=50)
         self.compute_positions()
         self._dataset_flat = []
-        for subject in ['S1', 'S5', 'S6', 'S7', 'S8', 'S9', 'S11']:
+        for subject in ["S1", "S5", "S6", "S7", "S8", "S9", "S11"]:
             for action in list(self._data[subject].keys()):
-                self._dataset_flat.append(self._data[subject][action]['rotations'])
+                self._dataset_flat.append(self._data[subject][action]["rotations"])
 
     def __getitem__(self, index):
         return self._dataset_flat[index]

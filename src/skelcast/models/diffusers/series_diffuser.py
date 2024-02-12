@@ -4,7 +4,7 @@ import torch.nn as nn
 from skelcast.models.diffusers.embedding import DiffusionEmbedding, PositionalEncoding
 
 
-class Series_Denoiser(nn.Module):
+class SeriesDenoiser(nn.Module):
     def __init__(self, input_dim, qkv_dim, num_layers, num_heads, prefix_len, pred_len, diff_steps):
         super().__init__()
 

@@ -3,6 +3,8 @@ import torch.nn as nn
 
 from typing import Tuple
 
+from skelcast.models import MODELS
+
 
 class MLP(nn.Module):
     def __init__(self, in_dim, out_dim, hidden_dim, activation: str = "relu"):
@@ -27,6 +29,8 @@ class MLP(nn.Module):
         x = self.activation(self.fc2(x))
         return x
 
+
+@MODELS.register_module()
 class TFlowDiag(nn.Module):
     def __init__(self,
                  skeleton_dim: int = 48,

@@ -4,6 +4,8 @@ import numpy as np
 
 from typing import Tuple, Union, Optional, List
 
+from skelcast.models import MODELS
+
 
 def generate_square_subsequent_mask(sz) -> torch.Tensor:
     mask = (torch.triu(torch.ones((sz, sz))) == 1).transpose(0, 1)
@@ -283,8 +285,9 @@ class Decoder(nn.Module):
                            z=z,
                            x=x,
                            y=y)
-    
 
+
+@MODELS.register_module()
 class TFlowVAE(nn.Module):
     def __init__(self,
                  skeleton_dim: int = 48,
